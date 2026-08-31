@@ -34,11 +34,13 @@ export default function App() {
   const [verProva, setVerProva] = useState(false)
 
   const modelo = TIPOS.find((t) => t.id === tipo)!
+  // A cotação vale poucos segundos de propósito — cotação que não expira é
+  // opção de graça para quem sabe esperar. Então ela é refeita a cada tick,
+  // que é justamente o ritmo em que o preço muda.
   const cotacao = useMemo(
     () => m.livro.cotar({ tipo, barreira: modelo.comBarreira ? barreira : undefined, valor, ticks }),
-    // a cotação vence em segundos; recotar a cada pulso mantém ela viva
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tipo, barreira, valor, ticks, m.pulso, modelo.comBarreira],
+    [tipo, barreira, valor, ticks, m.ultimo?.n, modelo.comBarreira],
   )
 
   const velas: Candle[] = useMemo(
