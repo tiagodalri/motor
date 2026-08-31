@@ -5,6 +5,6 @@ import { readFileSync, writeFileSync } from 'node:fs'
 const arquivo = 'docs/index.html'
 const v = Date.now().toString(36)
 let html = readFileSync(arquivo, 'utf8')
-html = html.replace(/(\/teeds\/assets\/teeds\.(?:js|css))(\?v=[^"']*)?/g, `$1?v=${v}`)
+html = html.replace(/(\/motor\/assets\/motor\.(?:js|css))(\?v=[^"']*)?/g, `$1?v=${v}`)
 writeFileSync(arquivo, html)
 console.log('versao publicada:', v)

@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -15,7 +19,9 @@
     "noUnusedLocals": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "//": "A pasta do Desktop nao permite apagar arquivos. O que veio junto da Teeds e nao pertence ao motor proprio fica listado aqui e e ignorado pela compilacao e pelo pacote. Quando a remocao for liberada, apagar de vez.",
   "exclude": [
     "src/core/deriv",
@@ -42,7 +48,6 @@
     "src/components/RobotSetup.tsx",
     "src/components/RobotLive.tsx",
     "src/components/DigitsPanel.tsx",
-    "src/components/PositionCard.tsx",
-    "src/App.tsx"
+    "src/components/PositionCard.tsx"
   ]
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Candle } from '../core/deriv/types'
+import type { Candle } from '../core/motor/tipos'
 import { CHART, T } from '../core/chart/theme'
 import {
   formatClock,
