@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { AG7_PADRAO, RoboAG7, type ConfigRobo, type EstadoRobo } from '../core/motor/robo'
-import type { Livro } from '../core/motor/livro'
-import type { MotorDeTicks } from '../core/motor/ticks'
+import { useEffect, useState } from 'react'
+import { AG7_PADRAO, type ConfigRobo, type EstadoRobo, type RoboAG7 } from '../core/motor/robo'
 import { PARAMETROS } from '../core/motor/precos'
 
 /**
@@ -17,32 +15,25 @@ const din = (v: number) =>
   `${v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 interface Props {
-  livro: Livro
-  motor: MotorDeTicks | null
-  clienteId: string
+  /** Criado e mantido pelo hook, não por esta tela: ele sobrevive à troca de aba. */
+  robo: RoboAG7 | null
   aoMexer: () => void
 }
 
-export function PainelRobo({ livro, motor, clienteId, aoMexer }: Props) {
+export function PainelRobo({ robo, aoMexer }: Props) {
   const [config, setConfig] = useState<ConfigRobo>({ ...AG7_PADRAO })
   const [estado, setEstado] = useState<EstadoRobo | null>(null)
-  const roboRef = useRef<RoboAG7 | null>(null)
-  const configRef = useRef(config)
-  configRef.current = config
 
-  // um robô por motor: trocar de instrumento é trocar de mesa
   useEffect(() => {
-    if (!motor) return
-    const robo = new RoboAG7({ livro, motor, clienteId, config: configRef.current })
-    roboRef.current = robo
-    const solta = robo.escutar((e) => { setEstado(e); aoMexer() })
-    return () => { robo.desligar(); solta(); roboRef.current = null }
-  }, [livro, motor, clienteId, aoMexer])
+    if (!robo) return
+    setConfig({ ...robo.config })
+    return robo.escutar((e) => { setEstado(e); aoMexer() })
+  }, [robo, aoMexer])
 
   const mexer = (patch: Partial<ConfigRobo>) => {
     setConfig((c) => {
       const novo = { ...c, ...patch }
-      if (roboRef.current) roboRef.current.config = novo
+      if (robo) robo.config = novo
       return novo
     })
   }
@@ -59,11 +50,11 @@ export function PainelRobo({ livro, motor, clienteId, aoMexer }: Props) {
           <em>dígito acima de {config.barreira} · 1 tick</em>
         </div>
         <button className={`robo-play ${ligado ? 'on' : ''}`}
-          disabled={!motor}
+          disabled={!robo}
           onClick={() => {
-            if (!roboRef.current) return
-            if (ligado) roboRef.current.desligar()
-            else roboRef.current.ligar()
+            if (!robo) return
+            if (ligado) robo.desligar()
+            else robo.ligar()
           }}>
           {ligado ? 'Parar' : 'Operar'}
         </button>

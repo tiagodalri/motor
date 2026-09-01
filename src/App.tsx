@@ -122,8 +122,7 @@ export default function App() {
               O preço não é puxado contra você — a casa ganha pela margem.
             </p>
 
-            <PainelRobo livro={m.livro} motor={m.motor} clienteId={m.cliente}
-              aoMexer={m.atualizar} />
+            <PainelRobo robo={m.robo} aoMexer={m.atualizar} />
           </aside>
 
           <main className="motor-centro">
