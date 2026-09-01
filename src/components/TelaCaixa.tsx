@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Livro } from '../core/motor/livro'
 import { CONTA } from '../core/motor/razao'
 import { PARAMETROS } from '../core/motor/precos'
@@ -48,6 +48,17 @@ export function TelaCaixa({ livro, clienteId, saldo, aoMexer }: Props) {
   const [metodo, setMetodo] = useState('pix')
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  /**
+   * Trava de duplo clique.
+   *
+   * A chave de idempotência da razão usa o relógio, então dois cliques
+   * separados por alguns milissegundos viram **dois saques**, não um
+   * recusado — o que é o comportamento certo para duas ordens de verdade e
+   * o comportamento errado para um dedo tremendo. Numa tela de dinheiro a
+   * segunda confirmação tem de ser deliberada.
+   */
+  const ultimo = useRef<{ assinatura: string; quando: number } | null>(null)
+  const [confirmando, setConfirmando] = useState(false)
 
   const abertos = livro.abertos(clienteId)
   const emJogo = abertos.reduce((t, c) => t + c.valor, 0)
@@ -62,6 +73,17 @@ export function TelaCaixa({ livro, clienteId, saldo, aoMexer }: Props) {
 
   function executar() {
     setErro(null); setOk(null)
+    const assinatura = `${aba}:${numero}`
+    const agora = Date.now()
+    const repetido = ultimo.current
+      && ultimo.current.assinatura === assinatura
+      && agora - ultimo.current.quando < 8_000
+    if (repetido && !confirmando) {
+      setConfirmando(true)
+      setErro(`Você acabou de ${aba === 'sacar' ? 'sacar' : 'depositar'} ${din(numero)}. `
+        + 'Clique de novo para repetir de propósito.')
+      return
+    }
     try {
       if (numero <= 0) throw new Error('Informe um valor maior que zero.')
       if (aba === 'depositar') {
@@ -71,6 +93,8 @@ export function TelaCaixa({ livro, clienteId, saldo, aoMexer }: Props) {
         livro.sacar(clienteId, numero)
         setOk(`Saque de ${din(numero)} enviado.`)
       }
+      ultimo.current = { assinatura, quando: agora }
+      setConfirmando(false)
       aoMexer()
     } catch (e) {
       setErro((e as Error).message)
@@ -127,7 +151,7 @@ export function TelaCaixa({ livro, clienteId, saldo, aoMexer }: Props) {
             <span>US$</span>
             <input value={valor} inputMode="decimal"
               onFocus={(e) => e.currentTarget.select()}
-              onChange={(e) => setValor(e.target.value)} />
+              onChange={(e) => { setValor(e.target.value); setConfirmando(false); setErro(null) }} />
           </div>
           <div className="caixa-atalhos">
             {[20, 50, 100, 250, 500].map((v) => (
@@ -151,9 +175,12 @@ export function TelaCaixa({ livro, clienteId, saldo, aoMexer }: Props) {
             ))}
           </div>
 
-          <button className={`caixa-btn ${aba === 'sacar' ? 'saque' : ''}`} onClick={executar}
+          <button className={`caixa-btn ${aba === 'sacar' ? 'saque' : ''} ${confirmando ? 'confirmar' : ''}`}
+            onClick={executar}
             disabled={numero <= 0 || (aba === 'sacar' && numero > saldo)}>
-            {aba === 'depositar' ? `Depositar ${din(numero)}` : `Sacar ${din(numero)}`}
+            {confirmando
+              ? 'Confirmar de novo'
+              : aba === 'depositar' ? `Depositar ${din(numero)}` : `Sacar ${din(numero)}`}
           </button>
 
           {erro && <p className="caixa-erro">{erro}</p>}
