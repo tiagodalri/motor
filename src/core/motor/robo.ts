@@ -3,22 +3,59 @@ import { PARAMETROS, type TipoContrato } from './precos'
 import type { MotorDeTicks } from './ticks'
 
 /**
- * AG7 contra a casa própria.
+ * Robôs de estratégia contra a casa própria.
  *
- * A mesma regra que roda na Teeds em cima da Deriv, agora do lado de cá do
- * balcão. Isto não é um enfeite: é o teste mais duro que existe para o
+ * A mesma mecânica que roda na Teeds em cima da Deriv, agora do lado de cá
+ * do balcão. Isto não é enfeite: é o teste mais duro que existe para o
  * controle de risco, porque um martingale é exatamente o padrão de aposta
  * que quebra casa. Ele aposta pequeno quase sempre e, na hora em que a
- * casa está perdendo, aposta grande — a pior correlação possível para
- * quem está do outro lado.
+ * casa está perdendo, aposta grande — a pior correlação possível para quem
+ * está do outro lado.
  *
- * A regra:
- *  - entra em toda operação, dígito acima de 5 (chance real de 40%)
+ * A gestão é comum a todos:
+ *  - entra em toda operação
  *  - mantém a entrada base enquanto as perdas seguidas forem menores que
  *    `galeApos`
  *  - a partir daí, recupera **a sequência inteira de prejuízo** de uma vez
  *  - ganhou, volta para a base
+ *
+ * O que muda de um robô para o outro é só onde ele ganha.
  */
+
+export interface Estrategia {
+  id: string
+  nome: string
+  /** Os dígitos que fazem o robô ganhar. É como o cliente entende a regra. */
+  digitos: number[]
+  tipo: TipoContrato
+  barreira: number
+  ticks: number
+}
+
+/**
+ * O catálogo.
+ *
+ * Os dois pagam nos mesmos 30% de chance — três dígitos em dez. São lados
+ * opostos da mesma faixa, o que na prática é bom para a casa: rodando
+ * juntos, um cobre o outro no livro de cenários.
+ */
+export const ESTRATEGIAS: Estrategia[] = [
+  {
+    id: 'ag7', nome: 'AG7',
+    digitos: [7, 8, 9],
+    // "acima de 6" é exatamente 7, 8 e 9
+    tipo: 'DIGITO_ACIMA', barreira: 6, ticks: 1,
+  },
+  {
+    id: 'ag2', nome: 'AG2',
+    digitos: [0, 1, 2],
+    // "abaixo de 3" é exatamente 0, 1 e 2
+    tipo: 'DIGITO_ABAIXO', barreira: 3, ticks: 1,
+  },
+]
+
+export const estrategiaPorId = (id: string): Estrategia =>
+  ESTRATEGIAS.find((e) => e.id === id) ?? ESTRATEGIAS[0]
 
 export interface ConfigRobo {
   valorBase: number
@@ -36,7 +73,7 @@ export interface ConfigRobo {
   ticks: number
 }
 
-export const AG7_PADRAO: ConfigRobo = {
+export const GESTAO_PADRAO: Omit<ConfigRobo, 'tipo' | 'barreira' | 'ticks'> = {
   valorBase: 0.30,
   galeApos: 3,
   fatorGale: 1,
@@ -44,10 +81,14 @@ export const AG7_PADRAO: ConfigRobo = {
   takeProfit: 0,
   stopLoss: 0,
   maxOperacoes: 0,
-  tipo: 'DIGITO_ACIMA',
-  barreira: 5,
-  ticks: 1,
 }
+
+export const configDe = (e: Estrategia): ConfigRobo => ({
+  ...GESTAO_PADRAO, tipo: e.tipo, barreira: e.barreira, ticks: e.ticks,
+})
+
+/** Mantido para quem já importava o nome antigo. */
+export const AG7_PADRAO: ConfigRobo = configDe(ESTRATEGIAS[0])
 
 export interface EstadoRobo {
   ligado: boolean
@@ -66,7 +107,7 @@ export interface EstadoRobo {
 
 type Ouvinte = (e: EstadoRobo) => void
 
-export class RoboAG7 {
+export class Robo {
   config: ConfigRobo
   private estado: EstadoRobo
   private livro: Livro
@@ -77,13 +118,17 @@ export class RoboAG7 {
   private soltarTick: (() => void) | null = null
   private soltarLivro: (() => void) | null = null
 
+  readonly estrategia: Estrategia
+
   constructor(args: {
-    livro: Livro; motor: MotorDeTicks; clienteId: string; config?: Partial<ConfigRobo>
+    livro: Livro; motor: MotorDeTicks; clienteId: string
+    estrategia?: Estrategia; config?: Partial<ConfigRobo>
   }) {
     this.livro = args.livro
     this.motor = args.motor
     this.clienteId = args.clienteId
-    this.config = { ...AG7_PADRAO, ...args.config }
+    this.estrategia = args.estrategia ?? ESTRATEGIAS[0]
+    this.config = { ...configDe(this.estrategia), ...args.config }
     this.estado = {
       ligado: false, operacoes: 0, ganhos: 0, perdas: 0, perdasSeguidas: 0,
       prejuizoDaSequencia: 0, resultado: 0, proximaEntrada: this.config.valorBase,
@@ -205,3 +250,6 @@ export class RoboAG7 {
     this.ouvintes.forEach((fn) => { try { fn(e) } catch { /* ignora */ } })
   }
 }
+
+/** Nome antigo, mantido para não quebrar quem já importava. */
+export { Robo as RoboAG7 }

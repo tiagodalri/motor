@@ -75,8 +75,11 @@ export const PARAMETROS = {
   aceitandoOrdens: true,
   /** Entrada mínima. Trinta centavos de dólar, sempre. */
   valorMinimo: 0.30,
-  /** Duração máxima em ticks. */
-  ticksMaximo: 10,
+  /**
+   * Duração máxima em ticks. Uma hora num instrumento de 1 tick por
+   * segundo — o teto existe para não haver contrato que ninguém acompanha.
+   */
+  ticksMaximo: 3_600,
 }
 
 /** Margem padrão de fábrica — o ponto de retorno quando o teste azedar. */

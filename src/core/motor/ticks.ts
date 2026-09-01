@@ -86,6 +86,17 @@ export class MotorDeTicks {
   adulterada = false
   /** Multiplicador de velocidade da rodada. 1 = tempo real. */
   velocidade = 1
+  /**
+   * Contador do tick, separado do tamanho da série.
+   *
+   * A série é podada para não crescer sem fim. Enquanto o número do tick
+   * saía de `serie.length + 1`, a poda fazia a numeração **andar para
+   * trás** — o tick 5001 era seguido do 3001. Como o livro indexa a
+   * liquidação pelo número do tick, contratos de duração longa passariam
+   * a vencer na hora errada, ou duas vezes. Não aparecia com contrato de
+   * 1 tick; aparece na hora que existe contrato de 5 minutos.
+   */
+  private contador = 0
 
   constructor(instrumento: Instrumento) {
     this.instrumento = instrumento
@@ -97,6 +108,7 @@ export class MotorDeTicks {
     this.compromisso = await abrirCompromisso(sementeCliente, sementeCasa)
     this.fluxo = await Fluxo.criar(this.compromisso.sementeCasa, sementeCliente)
     this.serie = []
+    this.contador = 0
     this.forcados = []
     // rodada nova é a única coisa que limpa a marca de adulteração
     this.adulterada = false
@@ -284,8 +296,9 @@ export class MotorDeTicks {
       preco = Number(texto.slice(0, -1) + String(forcado))
     }
 
+    this.contador += 1
     const tick: Tick = {
-      n: this.serie.length + 1,
+      n: this.contador,
       instrumento: i.codigo,
       preco,
       digito: ultimoDigito(preco, i.casas),

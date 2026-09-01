@@ -4,7 +4,7 @@ import { Livro, type Contrato } from '../core/motor/livro'
 import { Razao } from '../core/motor/razao'
 import { Torre, type Motores } from '../core/motor/torre'
 import { auditoria } from '../core/motor/auditoria'
-import { RoboAG7 } from '../core/motor/robo'
+import { ESTRATEGIAS, Robo } from '../core/motor/robo'
 
 /**
  * Liga o motor à interface.
@@ -44,7 +44,7 @@ export function useMotor() {
   const livroRef = useRef<Livro | null>(null)
   const motoresRef = useRef<Motores>({})
   const torreRef = useRef<Torre | null>(null)
-  const robosRef = useRef<Record<string, RoboAG7>>({})
+  const robosRef = useRef<Record<string, Robo[]>>({})
   const ativoRef = useRef<string>(instrumento.codigo)
 
   if (!livroRef.current) {
@@ -103,7 +103,9 @@ export function useMotor() {
         // dentro do componente, trocar para a torre de controle o mataria
         // no meio da sequência de gale — e é justamente na torre que se
         // quer olhar a cobertura enquanto ele opera.
-        robosRef.current[i.codigo] = new RoboAG7({ livro, motor, clienteId: CLIENTE })
+        robosRef.current[i.codigo] = ESTRATEGIAS.map(
+          (estrategia) => new Robo({ livro, motor, clienteId: CLIENTE, estrategia }),
+        )
       }
     })()
   }, [livro, atualizar])
@@ -125,7 +127,7 @@ export function useMotor() {
     instrumento, setInstrumento, instrumentos: INSTRUMENTOS,
     motor: motoresRef.current[instrumento.codigo] ?? null,
     motores: motoresRef.current,
-    robo: robosRef.current[instrumento.codigo] ?? null,
+    robos: robosRef.current[instrumento.codigo] ?? [],
     livro, torre, auditoria, cliente: CLIENTE,
     ticks, ultimo, abertos, historico, saldo, prova, pulso, atualizar,
   }
