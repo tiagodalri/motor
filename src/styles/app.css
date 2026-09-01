@@ -1,19 +1,59 @@
-/* Teeds - identidade visual clara */
+/* Teeds - identidade visual. Um conjunto de fichas, dois temas.
+   O gráfico lê estas mesmas variáveis na hora de pintar, então não existe
+   uma segunda paleta em JavaScript para alguém esquecer de atualizar. */
 :root {
   --bg: #ffffff;
   --surface: #f7f9fc;
   --surface-alt: #fdfeff;
   --border: #e4e9f2;
+  --grid: #eef2f7;
   --text: #1a2233;
   --muted: #7a8699;
   --primary: #4c6fff;
   --primary-soft: #edf1ff;
   --up: #12a150;
   --up-soft: #e8f6ee;
+  --up-fraco: rgba(18, 161, 80, 0.13);
   --down: #e5484d;
   --down-soft: #fdeced;
+  --down-fraco: rgba(229, 72, 77, 0.13);
+  --crosshair: #98a2b3;
+  --futuro: rgba(122, 134, 153, 0.045);
+  --contraste: #ffffff;
+  --aviso-bg: #fff8e6;
+  --aviso-borda: #f0d9a0;
+  --aviso-texto: #6f5310;
+  --aviso-forte: #5a4208;
   --radius: 10px;
   --shadow: 0 1px 2px rgba(26, 34, 51, 0.04), 0 8px 24px rgba(26, 34, 51, 0.06);
+  color-scheme: light;
+}
+
+:root[data-tema="escuro"] {
+  --bg: #131a26;
+  --surface: #0d121b;
+  --surface-alt: #182130;
+  --border: #232f42;
+  --grid: #1b2534;
+  --text: #e3eaf5;
+  --muted: #8494ac;
+  --primary: #6b87ff;
+  --primary-soft: #1d2743;
+  --up: #26c281;
+  --up-soft: #12301f;
+  --up-fraco: rgba(38, 194, 129, 0.16);
+  --down: #ff5f6b;
+  --down-soft: #331419;
+  --down-fraco: rgba(255, 95, 107, 0.16);
+  --crosshair: #6b7a92;
+  --futuro: rgba(255, 255, 255, 0.022);
+  --contraste: #0d121b;
+  --aviso-bg: #2a2313;
+  --aviso-borda: #4a3d18;
+  --aviso-texto: #e8cf8f;
+  --aviso-forte: #f5e2ab;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.32), 0 8px 24px rgba(0, 0, 0, 0.28);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -2704,10 +2744,10 @@ button, input { font: inherit; color: inherit; }
 }
 .robo-recusa {
   margin: 9px 0 0; padding: 7px 9px; border-radius: 7px;
-  background: #fff8e6; border: 1px solid #f0d9a0;
-  font-size: 10.5px; line-height: 1.5; color: #7a5c14;
+  background: var(--aviso-bg); border: 1px solid var(--aviso-borda);
+  font-size: 10.5px; line-height: 1.5; color: var(--aviso-texto);
 }
-.robo-recusa b { color: #6b4e08; }
+.robo-recusa b { color: var(--aviso-forte); }
 .robo-parou {
   margin: 9px 0 0; font-size: 10.5px; color: var(--down);
 }
@@ -2807,10 +2847,10 @@ button, input { font: inherit; color: inherit; }
 
 .copy-aviso {
   padding: 11px 14px; border-radius: 10px; margin-bottom: 18px;
-  background: #fff8e6; border: 1px solid #f0d9a0; color: #6f5310;
+  background: var(--aviso-bg); border: 1px solid var(--aviso-borda); color: var(--aviso-texto);
   font-size: 12.5px; line-height: 1.6; max-width: 100ch;
 }
-.copy-aviso b { color: #5a4208; }
+.copy-aviso b { color: var(--aviso-forte); }
 
 .copy-lista {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;
@@ -2892,8 +2932,8 @@ button, input { font: inherit; color: inherit; }
 }
 .copy-ativo b { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .copy-recusa {
-  margin: 0 0 10px; font-size: 10.5px; line-height: 1.5; color: #7a5c14;
-  padding: 7px 9px; border-radius: 7px; background: #fff8e6; border: 1px solid #f0d9a0;
+  margin: 0 0 10px; font-size: 10.5px; line-height: 1.5; color: var(--aviso-texto);
+  padding: 7px 9px; border-radius: 7px; background: var(--aviso-bg); border: 1px solid var(--aviso-borda);
 }
 
 .copy-acoes { display: flex; gap: 8px; align-items: center; }
@@ -2955,7 +2995,7 @@ button, input { font: inherit; color: inherit; }
 .rank-selo {
   padding: 2px 7px; border-radius: 5px; font-size: 8.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em;
-  background: #fff8e6; color: #8a6a12; border: 1px solid #f0d9a0; white-space: nowrap;
+  background: var(--aviso-bg); color: var(--aviso-texto); border: 1px solid var(--aviso-borda); white-space: nowrap;
 }
 
 .rank-filtros { display: flex; gap: 6px; margin: 11px 0 9px; }
@@ -3025,7 +3065,7 @@ button, input { font: inherit; color: inherit; }
 .caixa-selo {
   padding: 4px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em;
-  background: #fff8e6; color: #8a6a12; border: 1px solid #f0d9a0; white-space: nowrap;
+  background: var(--aviso-bg); color: var(--aviso-texto); border: 1px solid var(--aviso-borda); white-space: nowrap;
 }
 
 .caixa-grade {
@@ -3104,10 +3144,10 @@ button, input { font: inherit; color: inherit; }
 .caixa-ok { margin: 10px 0 0; font-size: 11.5px; color: var(--up); }
 .caixa-aviso {
   margin: 14px 0 0; padding: 10px 12px; border-radius: 9px;
-  background: #fff8e6; border: 1px solid #f0d9a0; color: #6f5310;
+  background: var(--aviso-bg); border: 1px solid var(--aviso-borda); color: var(--aviso-texto);
   font-size: 11px; line-height: 1.6;
 }
-.caixa-aviso b { color: #5a4208; }
+.caixa-aviso b { color: var(--aviso-forte); }
 
 .caixa-extrato .caixa-nota { padding-top: 0; border-top: 0; margin-bottom: 10px; }
 .caixa-linhas { display: flex; flex-direction: column; max-height: 460px; overflow-y: auto; }
@@ -3129,3 +3169,131 @@ button.conta-chip { cursor: pointer; font: inherit; }
   .caixa-grade { grid-template-columns: 1fr; }
   .caixa { padding: 16px; }
 }
+
+/* ===================================================== mesa de operação ===
+   A tela de operar ganhou barra de ativos abertos, lista com preço ao vivo
+   e dois temas. O que se olha aqui é preço, direção e movimento — então é
+   isso que ocupa espaço, e o resto encolhe.
+*/
+.mesa { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* ------------------------------------------------------- abas dos ativos */
+.abas-ativos {
+  display: flex; align-items: stretch; flex-shrink: 0;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  padding: 0 12px; overflow: visible;
+}
+.abas-lista { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; }
+.aba-ativo {
+  display: flex; align-items: stretch; position: relative;
+  border-bottom: 2px solid transparent;
+}
+.aba-ativo.on { border-bottom-color: var(--primary); background: var(--surface-alt); }
+.aba-corpo {
+  display: flex; align-items: baseline; gap: 8px; cursor: pointer;
+  padding: 9px 8px 8px 12px; border: 0; background: none; white-space: nowrap;
+}
+.aba-cod { font-size: 12px; font-weight: 650; color: var(--muted); letter-spacing: .01em; }
+.aba-ativo.on .aba-cod { color: var(--text); }
+.aba-preco {
+  font-size: 12px; font-weight: 550; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.aba-var { font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.aba-var.up { color: var(--up); }
+.aba-var.down { color: var(--down); }
+.aba-fechar {
+  border: 0; background: none; cursor: pointer; padding: 0 9px 0 2px;
+  color: #b3bcca; font-size: 15px; line-height: 1;
+}
+.aba-fechar:hover { color: var(--down); }
+
+.aba-mais { position: relative; display: flex; align-items: center; padding-left: 4px; }
+.aba-add {
+  width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--muted); font-size: 15px; line-height: 1;
+}
+.aba-add:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.aba-add.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+.aba-add:disabled { opacity: .35; cursor: not-allowed; }
+.aba-menu {
+  position: absolute; top: 32px; left: 0; z-index: 20; min-width: 208px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 11px;
+  box-shadow: var(--shadow); padding: 5px; display: flex; flex-direction: column; gap: 1px;
+}
+.aba-menu button {
+  display: flex; align-items: baseline; gap: 8px; text-align: left; cursor: pointer;
+  padding: 7px 9px; border: 0; border-radius: 8px; background: none;
+}
+.aba-menu button:hover { background: var(--surface); }
+.aba-menu b { font-size: 12px; font-weight: 650; }
+.aba-menu em { font-style: normal; font-size: 11px; color: var(--muted); }
+.aba-menu i {
+  font-style: normal; font-size: 11px; color: var(--muted); margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- watchlist */
+.watch { display: flex; flex-direction: column; gap: 1px; }
+.watch-topo {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 7px;
+}
+.watch-topo em { font-style: normal; font-size: 9.5px; color: var(--muted); }
+.watch-item {
+  display: grid; grid-template-columns: 1fr 48px auto;
+  gap: 8px; align-items: center; cursor: pointer; text-align: left;
+  padding: 8px 9px; border: 1px solid transparent; border-radius: 9px; background: none;
+}
+.watch-item:hover { background: var(--surface); }
+.watch-item.on { background: var(--primary-soft); border-color: var(--primary); }
+.watch-item.aberto:not(.on) { background: var(--surface); }
+.watch-id { min-width: 0; }
+.watch-id b { display: block; font-size: 12px; font-weight: 650; }
+.watch-id em {
+  display: block; font-style: normal; font-size: 10px; color: var(--muted); margin-top: 1px;
+}
+.watch-faisca { width: 48px; height: 18px; display: block; }
+.watch-num { text-align: right; }
+.watch-num b {
+  display: block; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.watch-num em {
+  display: block; font-style: normal; font-size: 10px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.watch-num .up { color: var(--up); }
+.watch-num .down { color: var(--down); }
+
+/* ------------------------------------------------------------ tema e topo */
+.tema-botao {
+  width: 30px; height: 30px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--muted); font-size: 14px; line-height: 1;
+}
+.tema-botao:hover { border-color: var(--primary); color: var(--primary); }
+
+.motor-modo { display: flex; gap: 3px; margin-left: 14px; }
+.motor-modo button {
+  padding: 3px 9px; border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+  background: var(--bg); color: var(--muted); font-size: 10.5px; font-weight: 550;
+}
+.motor-modo button.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+
+/* --------------------------------------------------- ajustes para o escuro */
+:root[data-tema="escuro"] .chart { background: var(--bg); }
+:root[data-tema="escuro"] .aba-fechar { color: #56617a; }
+:root[data-tema="escuro"] .robo-digitos i { background: var(--surface-alt); color: #56617a; }
+:root[data-tema="escuro"] .rank-var { color: #56617a; }
+:root[data-tema="escuro"] .copy-meses span { color: var(--muted); }
+:root[data-tema="escuro"] .caixa-metodos button { background: var(--surface-alt); }
+:root[data-tema="escuro"] .rank-filtros input,
+:root[data-tema="escuro"] .rank-filtros select,
+:root[data-tema="escuro"] .copy-form input,
+:root[data-tema="escuro"] .caixa-valor,
+:root[data-tema="escuro"] .robo-campos input { background: var(--surface); }
+:root[data-tema="escuro"] .modalidades,
+:root[data-tema="escuro"] .caixa-abas { background: var(--surface); }
+:root[data-tema="escuro"] .modalidades button.on,
+:root[data-tema="escuro"] .caixa-abas button.on { background: var(--surface-alt); }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Candle } from '../core/motor/tipos'
-import { CHART, T } from '../core/chart/theme'
+import { CHART, paleta } from '../core/chart/theme'
 import {
   formatClock,
   formatDateTime,
@@ -84,8 +84,27 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
     [plot, range],
   )
 
-  const stepX = view.items.length ? plot.w / view.items.length : 0
-  const toX = useCallback((i: number) => plot.x + i * stepX + stepX / 2, [plot, stepX])
+  /**
+   * Onde cada vela cai no eixo.
+   *
+   * Duas correções que mudam tudo visualmente:
+   *
+   *  - a série é ancorada **à direita** e a vela tem largura máxima. Antes
+   *    o passo era `largura / número de velas`, então quinze velas viravam
+   *    quinze tijolos de setenta pixels. Agora poucas velas são poucas
+   *    velas, encostadas no agora, do tamanho certo.
+   *  - uma fatia da direita fica reservada ao **futuro**. Sem ela, a linha
+   *    de expiração de um contrato de cinco minutos nasce fora da tela e a
+   *    pessoa não vê para onde está correndo.
+   */
+  const futuroPx = plot.w * CHART.fatiaDoFuturo
+  const areaSerie = Math.max(1, plot.w - futuroPx)
+  const stepX = Math.min(areaSerie / Math.max(1, vp.size), CHART.larguraMaxima * 1.75)
+  const xUltimo = plot.x + areaSerie - stepX / 2
+  const toX = useCallback(
+    (i: number) => xUltimo - (view.items.length - 1 - i) * stepX,
+    [xUltimo, stepX, view.items.length],
+  )
 
   // ------------------------------------------------------------ desenho
   useEffect(() => {
@@ -111,7 +130,16 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
       const items = view.items
       if (!items.length) return
 
+      const T = paleta()
       const yTicks = priceTicks(range)
+
+      // faixa do futuro: o "agora" ganha uma borda e o que vem depois fica
+      // com fundo levemente diferente, para a expiração ter onde aparecer
+      const xAgora = xUltimo + stepX / 2
+      if (xAgora < plot.x + plot.w) {
+        ctx.fillStyle = T.futuro
+        ctx.fillRect(xAgora, plot.y, plot.x + plot.w - xAgora, plot.h)
+      }
 
       // --- grade horizontal + eixo de precos
       ctx.font = '11px ui-sans-serif, -apple-system, system-ui, sans-serif'
@@ -131,23 +159,41 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
       }
 
       // --- grade vertical + eixo de tempo
-      const labelEvery = Math.max(1, Math.ceil(items.length / 6))
+      //
+      // Com vela de cinco segundos, seis rótulos de hora:minuto viram seis
+      // vezes "14:06" — informação nenhuma. O rótulo passa a mostrar
+      // segundos quando o período é curto, e um rótulo repetido é pulado.
+      const periodo = items.length > 1 ? items[1].epoch - items[0].epoch : 60
+      const comSegundos = periodo < 60
+      const rotulo = (epoch: number) => {
+        const d = new Date(epoch * 1000)
+        const dois = (n: number) => String(n).padStart(2, '0')
+        return comSegundos
+          ? `${dois(d.getMinutes())}:${dois(d.getSeconds())}`
+          : `${dois(d.getHours())}:${dois(d.getMinutes())}`
+      }
+      const aCada = Math.max(1, Math.ceil(items.length / Math.max(3, Math.floor(areaSerie / 96))))
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      for (let i = 0; i < items.length; i += labelEvery) {
+      let anterior = ''
+      for (let i = items.length - 1; i >= 0; i -= aCada) {
         const x = toX(i)
+        if (x < plot.x + 14) break
+        const texto = rotulo(items[i].epoch)
         ctx.strokeStyle = T.grid
         ctx.beginPath()
         ctx.moveTo(Math.round(x) + 0.5, plot.y)
         ctx.lineTo(Math.round(x) + 0.5, plot.y + plot.h)
         ctx.stroke()
+        if (texto === anterior) continue
+        anterior = texto
         ctx.fillStyle = T.muted
-        ctx.fillText(formatClock(items[i].epoch), x, plot.y + plot.h + 7)
+        ctx.fillText(texto, x, plot.y + plot.h + 8)
       }
 
       // --- serie
       if (mode === 'candles') {
-        const bodyW = Math.max(1, Math.min(14, stepX * 0.66))
+        const bodyW = Math.max(1, Math.min(CHART.larguraMaxima, stepX * 0.62))
         for (let i = 0; i < items.length; i++) {
           const c = items[i]
           const up = c.close >= c.open
@@ -171,8 +217,8 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
       } else {
         // area + linha
         const grad = ctx.createLinearGradient(0, plot.y, 0, plot.y + plot.h)
-        grad.addColorStop(0, 'rgba(76, 111, 255, 0.18)')
-        grad.addColorStop(1, 'rgba(76, 111, 255, 0)')
+        grad.addColorStop(0, comAlfa(T.primary, 0.20))
+        grad.addColorStop(1, comAlfa(T.primary, 0))
         ctx.beginPath()
         ctx.moveTo(toX(0), toY(items[0].close))
         for (let i = 1; i < items.length; i++) ctx.lineTo(toX(i), toY(items[i].close))
@@ -194,6 +240,13 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
 
       // --- linha do preco atual
       const last = items[items.length - 1]
+      // divisor entre o que aconteceu e o que ainda não aconteceu
+      ctx.strokeStyle = T.border
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(Math.round(xAgora) + 0.5, plot.y)
+      ctx.lineTo(Math.round(xAgora) + 0.5, plot.y + plot.h)
+      ctx.stroke()
       const lastUp = last.close >= last.open
       const yLast = toY(last.close)
       ctx.save()
@@ -214,7 +267,7 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
       ctx.fillStyle = mode === 'candles' ? (lastUp ? T.up : T.down) : T.primary
       roundRect(ctx, bx, yLast - 9, tw + 10, 18, 4)
       ctx.fill()
-      ctx.fillStyle = '#fff'
+      ctx.fillStyle = T.contraste
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
       ctx.fillText(label, bx + 5, yLast)
@@ -222,8 +275,8 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
       // --- operacoes abertas: entrada, faixa de duracao e expiracao
       if (markers.length && items.length > 1) {
         const passo = items[1].epoch - items[0].epoch || 60
-        const inicio = items[0].epoch
-        const xPara = (epoch: number) => plot.x + ((epoch - inicio) / passo) * stepX + stepX / 2
+        const fim = items[items.length - 1].epoch
+        const xPara = (epoch: number) => xUltimo + ((epoch - fim) / passo) * stepX
 
         for (const m of markers) {
           const subiu = m.type === 'CALL' || m.type === 'MULTUP' || m.type === 'HIGHER'
@@ -236,8 +289,14 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
           const a = Math.max(plot.x, Math.min(xEntrada, xFim))
           const b = Math.min(plot.x + plot.w, Math.max(xEntrada, xFim))
           if (b > a) {
-            ctx.fillStyle = subiu ? 'rgba(18,161,80,0.05)' : 'rgba(229,72,77,0.05)'
+            // Antes isto pintava metade da tela de verde: um contrato de
+            // cinco minutos com vela de cinco segundos ocupa sessenta
+            // colunas. A faixa fica quase invisível de propósito — quem
+            // marca o contrato são as linhas, não o fundo.
+            ctx.fillStyle = subiu ? T.upFraco : T.downFraco
+            ctx.globalAlpha = 0.35
             ctx.fillRect(a, plot.y, b - a, plot.h)
+            ctx.globalAlpha = 1
           }
 
           // linha do preco de entrada
@@ -262,7 +321,7 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
               ctx.fillStyle = cor
               roundRect(ctx, lx - 4, y - 17, tw2 + 8, 14, 3)
               ctx.fill()
-              ctx.fillStyle = '#fff'
+              ctx.fillStyle = T.contraste
               ctx.textAlign = 'left'
               ctx.textBaseline = 'middle'
               ctx.fillText(txt, lx, y - 10)
@@ -373,8 +432,11 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
       setCursor(null)
       return
     }
-    const index = stepX > 0 ? Math.floor((x - plot.x) / stepX) : -1
-    setCursor({ x, y, index })
+    const bruto = stepX > 0
+      ? view.items.length - 1 - Math.round((xUltimo - x) / stepX)
+      : -1
+    const index = Math.max(0, Math.min(view.items.length - 1, bruto))
+    setCursor({ x, y, index: bruto >= 0 && bruto < view.items.length ? index : -1 })
   }
 
   const endDrag = () => {
@@ -433,4 +495,27 @@ function roundRect(
   ctx.arcTo(x, y + h, x, y, r)
   ctx.arcTo(x, y, x + w, y, r)
   ctx.closePath()
+}
+
+/**
+ * Aplica alfa numa cor vinda do CSS.
+ *
+ * O CSS devolve `#4c6fff` ou `rgb(76 111 255)` conforme o navegador, então
+ * a conversão precisa aguentar as duas — e cair de pé se vier outra coisa.
+ */
+function comAlfa(cor: string, alfa: number): string {
+  const c = cor.trim()
+  if (c.startsWith('#')) {
+    const h = c.length === 4
+      ? c.slice(1).split('').map((x) => x + x).join('')
+      : c.slice(1, 7)
+    const n = Number.parseInt(h, 16)
+    if (Number.isNaN(n)) return c
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alfa})`
+  }
+  const nums = c.match(/[\d.]+/g)
+  if (nums && nums.length >= 3) {
+    return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alfa})`
+  }
+  return c
 }

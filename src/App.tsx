@@ -3,6 +3,9 @@ import { PriceChart, type ContractMarker } from './components/PriceChart'
 import { PainelCasa } from './components/PainelCasa'
 import { TorreDeControle } from './components/TorreDeControle'
 import { PainelRobos } from './components/PainelRobos'
+import { AbasDeAtivos } from './components/AbasDeAtivos'
+import { Watchlist } from './components/Watchlist'
+import { useTema } from './hooks/useTema'
 import { TelaCopy } from './components/TelaCopy'
 import { TelaCaixa } from './components/TelaCaixa'
 import { Brand } from './components/Brand'
@@ -32,6 +35,7 @@ type Modalidade = 'digitos' | 'direcao'
 
 export default function App() {
   const m = useMotor()
+  const { tema, alternar } = useTema()
   const [tela, setTela] = useState<'operar' | 'copy' | 'caixa' | 'casa' | 'torre'>('operar')
   const [modalidade, setModalidade] = useState<Modalidade>('digitos')
   const [tipo, setTipo] = useState<TipoContrato>('DIGITO_ACIMA')
@@ -42,6 +46,27 @@ export default function App() {
   const [periodo, setPeriodo] = useState(15)
   const [erro, setErro] = useState<string | null>(null)
   const [verProva, setVerProva] = useState(false)
+  // os quatro motores sempre rodaram juntos; as abas são a tela admitindo isso
+  const [abertos, setAbertos] = useState<string[]>([m.instrumento.codigo])
+
+  function abrirAtivo(codigo: string) {
+    const alvo = m.instrumentos.find((i) => i.codigo === codigo)
+    if (!alvo) return
+    setAbertos((a) => (a.includes(codigo) ? a : [...a, codigo]))
+    m.setInstrumento(alvo)
+  }
+
+  function fecharAtivo(codigo: string) {
+    setAbertos((a) => {
+      const resto = a.filter((c) => c !== codigo)
+      if (resto.length === 0) return a
+      if (codigo === m.instrumento.codigo) {
+        const proximo = m.instrumentos.find((i) => i.codigo === resto[resto.length - 1])
+        if (proximo) m.setInstrumento(proximo)
+      }
+      return resto
+    })
+  }
 
   const direcao = modalidade === 'direcao'
   const modelo = TIPOS.find((t) => t.id === tipo)!
@@ -120,6 +145,11 @@ export default function App() {
           <button className="prova-botao" onClick={() => setVerProva((v) => !v)}>
             Prova de honestidade
           </button>
+          <button className="tema-botao" onClick={alternar}
+            title={tema === 'claro' ? 'Mudar para o modo escuro' : 'Mudar para o modo claro'}
+            aria-label="Alternar tema">
+            {tema === 'claro' ? '◐' : '◑'}
+          </button>
           <button className="conta-chip demo" onClick={() => setTela('caixa')}
             title="Ir para o caixa">
             <span className="selo demo">Fictício</span>
@@ -154,21 +184,18 @@ export default function App() {
       ) : tela === 'casa' ? (
         <PainelCasa livro={m.livro} instrumento={m.instrumento.codigo} />
       ) : (
+        <div className="mesa">
+        <AbasDeAtivos abertos={abertos} ativo={m.instrumento.codigo}
+          instrumentos={m.instrumentos} motores={m.motores}
+          aoTrocar={abrirAtivo} aoFechar={fecharAtivo} aoAbrir={abrirAtivo} />
         <div className="motor-layout">
           <aside className="motor-lista">
-            <span className="rot">Instrumentos</span>
-            {m.instrumentos.map((i) => (
-              <button key={i.codigo} className={i.codigo === m.instrumento.codigo ? 'on' : ''}
-                onClick={() => m.setInstrumento(i)}>
-                <b>{i.nome}</b>
-                <em>volatilidade {(i.volatilidade * 100).toFixed(0)}% · {i.intervalo}s</em>
-              </button>
-            ))}
+            <Watchlist instrumentos={m.instrumentos} motores={m.motores}
+              ativo={m.instrumento.codigo} abertos={abertos} aoEscolher={abrirAtivo} />
             <p className="motor-nota">
               Índices gerados aqui dentro por movimento browniano sem deriva.
               O preço não é puxado contra você — a casa ganha pela margem.
             </p>
-
             <PainelRobos robos={m.robos} aoMexer={m.atualizar} />
           </aside>
 
@@ -177,6 +204,10 @@ export default function App() {
               <b>{m.instrumento.nome}</b>
               <strong>{m.ultimo ? m.ultimo.preco.toFixed(m.instrumento.casas) : '—'}</strong>
               <span>tick {m.ultimo?.n ?? 0}</span>
+              <div className="motor-modo">
+                <button className={!direcao ? 'on' : ''} onClick={() => setModalidade('digitos')}>linha</button>
+                <button className={direcao ? 'on' : ''} onClick={() => setModalidade('direcao')}>velas</button>
+              </div>
               {direcao && (
                 <div className="motor-periodos">
                   {PERIODOS.map((p) => (
@@ -317,6 +348,7 @@ export default function App() {
               {m.historico.length === 0 && <p className="motor-vazio">Nada ainda.</p>}
             </div>
           </aside>
+        </div>
         </div>
       )}
     </div>
