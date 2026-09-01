@@ -90,7 +90,10 @@ export function useMotor() {
           }
           // o mesmo tick que move o gráfico liquida os contratos
           if (livro.liquidarTick(t).length > 0) atualizar()
-          else setPulso((n) => n + 1)
+          // um pulso por segundo, não quatro: só o instrumento em tela
+          // dispara o re-render. A torre lê os objetos vivos a cada render,
+          // então ela continua mostrando a casa inteira atualizada.
+          else if (t.instrumento === ativoRef.current) setPulso((n) => n + 1)
         })
         motor.ligar()
       }
