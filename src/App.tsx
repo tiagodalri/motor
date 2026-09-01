@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react'
 import { PriceChart } from './components/PriceChart'
 import { PainelCasa } from './components/PainelCasa'
 import { TorreDeControle } from './components/TorreDeControle'
+import { PainelRobo } from './components/PainelRobo'
 import { Brand } from './components/Brand'
 import { useMotor } from './hooks/useMotor'
 import { OrdemRecusada } from './core/motor/livro'
 import {
-  digitosQuePagam, regraEmPalavras, type TipoContrato,
+  PARAMETROS, digitosQuePagam, regraEmPalavras, type TipoContrato,
 } from './core/motor/precos'
 import type { Candle } from './core/motor/tipos'
 
@@ -29,7 +30,7 @@ export default function App() {
   const [tela, setTela] = useState<'operar' | 'casa' | 'torre'>('operar')
   const [tipo, setTipo] = useState<TipoContrato>('DIGITO_ACIMA')
   const [barreira, setBarreira] = useState(5)
-  const [valor, setValor] = useState(1)
+  const [valor, setValor] = useState(PARAMETROS.valorMinimo)
   const [ticks, setTicks] = useState(1)
   const [erro, setErro] = useState<string | null>(null)
   const [verProva, setVerProva] = useState(false)
@@ -120,6 +121,9 @@ export default function App() {
               Índices gerados aqui dentro por movimento browniano sem deriva.
               O preço não é puxado contra você — a casa ganha pela margem.
             </p>
+
+            <PainelRobo livro={m.livro} motor={m.motor} clienteId={m.cliente}
+              aoMexer={m.atualizar} />
           </aside>
 
           <main className="motor-centro">
@@ -159,9 +163,9 @@ export default function App() {
             )}
 
             <label><span className="rot">Valor</span>
-              <input type="number" min={0.35} step={0.5} value={valor}
+              <input type="number" min={PARAMETROS.valorMinimo} step={0.5} value={valor}
                 onFocus={(e) => e.currentTarget.select()}
-                onChange={(e) => setValor(Math.max(0.35, Number(e.target.value) || 0))} />
+                onChange={(e) => setValor(Math.max(PARAMETROS.valorMinimo, Number(e.target.value) || 0))} />
             </label>
 
             <label><span className="rot">Duração (ticks)</span>

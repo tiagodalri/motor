@@ -2,6 +2,7 @@ import { auditoria, type Peso } from './auditoria'
 import type { Livro } from './livro'
 import { MARGEM, MARGEM_PADRAO, PARAMETROS, type TipoContrato } from './precos'
 import { LIMITES_PADRAO, type Limites } from './risco'
+import { COBERTURA_PADRAO, type ModoCobertura } from './cobertura'
 import { MotorDeTicks, type Instrumento } from './ticks'
 
 /**
@@ -98,6 +99,39 @@ export class Torre {
     const antes = this.livro.risco.perdaDeHoje(clienteId)
     this.livro.risco.zerarPerdaDoDia(clienteId)
     this.log('ajuste', 'risco', `zerar perda do dia · ${clienteId}`, antes, 0)
+  }
+
+  /* --------------------------------------------------------- cobertura */
+
+  definirModoDeCobertura(modo: ModoCobertura): void {
+    const antes = this.livro.risco.cobertura.modo
+    if (antes === modo) return
+    this.livro.risco.cobertura = { ...this.livro.risco.cobertura, modo }
+    // desligar a cobertura devolve à casa a possibilidade de quebrar: é a
+    // única alavanca aqui que remove uma garantia dada ao próprio negócio
+    this.log(modo === 'desligada' ? 'quebra' : 'ajuste', 'cobertura', 'modo', antes, modo)
+  }
+
+  definirFracaoDoCaixa(f: number): void {
+    const antes = this.livro.risco.cobertura.fracaoDoCaixa
+    const novo = Math.max(0, Math.min(1, f))
+    if (antes === novo) return
+    this.livro.risco.cobertura = { ...this.livro.risco.cobertura, fracaoDoCaixa: novo }
+    this.log('ajuste', 'cobertura', 'fração do caixa em risco',
+      `${(antes * 100).toFixed(0)}%`, `${(novo * 100).toFixed(0)}%`)
+  }
+
+  definirBanca(v: number): void {
+    const antes = this.livro.risco.cobertura.banca
+    const novo = Math.max(0, v)
+    if (antes === novo) return
+    this.livro.risco.cobertura = { ...this.livro.risco.cobertura, banca: novo }
+    this.log('ajuste', 'cobertura', 'banca declarada', antes, novo)
+  }
+
+  restaurarCobertura(): void {
+    this.livro.risco.cobertura = { ...COBERTURA_PADRAO }
+    this.log('ajuste', 'cobertura', 'política restaurada ao padrão')
   }
 
   /* ------------------------------------------------------------ preços */

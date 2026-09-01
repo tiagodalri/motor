@@ -73,8 +73,8 @@ export const PARAMETROS = {
    * o motor de preço.
    */
   aceitandoOrdens: true,
-  /** Piso e teto do valor de uma aposta, do lado da cotação. */
-  valorMinimo: 0.35,
+  /** Entrada mínima. Trinta centavos de dólar, sempre. */
+  valorMinimo: 0.30,
   /** Duração máxima em ticks. */
   ticksMaximo: 10,
 }

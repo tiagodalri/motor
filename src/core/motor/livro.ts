@@ -67,6 +67,8 @@ export class Livro {
   constructor(razao = new Razao(), limites: Limites = LIMITES_PADRAO) {
     this.razao = razao
     this.risco = new Risco(limites)
+    // a cobertura precisa saber quanto a casa tem para poder decidir
+    this.risco.lucroDaCasa = () => this.razao.saldo(CONTA.casa)
     // retoma a numeração de onde a razão guardada parou
     this.sequencia = razao.maiorContrato() + 1
   }
@@ -170,6 +172,8 @@ export class Livro {
 
     this.risco.abrir(id, {
       clienteId, instrumento, tickLiquidacao, exposicao: cotacao.exposicao,
+      tipo: cotacao.tipo, barreira: cotacao.barreira,
+      valor: cotacao.valor, pagamento: cotacao.pagamento,
     })
 
     this.avisar(contrato)

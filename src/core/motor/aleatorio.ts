@@ -43,8 +43,12 @@ export function sementeNova(): string {
 }
 
 /** Cria o compromisso da rodada. O hash pode ser publicado; a semente, não. */
-export async function abrirCompromisso(sementeCliente: string): Promise<Compromisso> {
-  const sementeCasa = sementeNova()
+export async function abrirCompromisso(
+  sementeCliente: string,
+  /** Só para teste e para refazer uma rodada. Em produção, sempre sorteada. */
+  sementeFixa?: string,
+): Promise<Compromisso> {
+  const sementeCasa = sementeFixa ?? sementeNova()
   return {
     hash: await sha256(sementeCasa),
     sementeCasa,

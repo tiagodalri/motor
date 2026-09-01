@@ -6,6 +6,7 @@ import type { Auditoria, Peso } from '../core/motor/auditoria'
 import { MARGEM, PARAMETROS, type TipoContrato } from '../core/motor/precos'
 import { INSTRUMENTOS } from '../core/motor/ticks'
 import type { Limites } from '../core/motor/risco'
+import { cenarios, grauDeCobertura, type ModoCobertura } from '../core/motor/cobertura'
 
 /**
  * Torre de controle da casa.
@@ -56,9 +57,10 @@ const TIPOS_MARGEM: Array<{ id: TipoContrato; nome: string }> = [
   { id: 'DESCER', nome: 'Descer' },
 ]
 
-type Aba = 'risco' | 'precos' | 'motores' | 'contas' | 'posicoes' | 'auditoria'
+type Aba = 'cobertura' | 'risco' | 'precos' | 'motores' | 'contas' | 'posicoes' | 'auditoria'
 
 const ABAS: Array<{ id: Aba; nome: string; nota: string }> = [
+  { id: 'cobertura', nome: 'Cobertura', nota: 'a trava que não deixa a casa quebrar' },
   { id: 'risco', nome: 'Risco', nota: 'limites e disjuntor' },
   { id: 'precos', nome: 'Preço', nota: 'margem e cotação' },
   { id: 'motores', nome: 'Motores', nota: 'série, velocidade, rodada' },
@@ -142,7 +144,7 @@ function Bloco({ titulo, nota, children, tom }: {
 /* ------------------------------------------------------------------ tela */
 
 export function TorreDeControle({ livro, torre, motores, auditoria, aoMexer }: Props) {
-  const [aba, setAba] = useState<Aba>('risco')
+  const [aba, setAba] = useState<Aba>('cobertura')
   const [, setEco] = useState(0)
   const refazer = () => { setEco((n) => n + 1); aoMexer() }
 
@@ -172,6 +174,9 @@ export function TorreDeControle({ livro, torre, motores, auditoria, aoMexer }: P
             tom={PARAMETROS.aceitandoOrdens ? 'ok' : 'atencao'} />
           <Sinal rot="Disjuntor" valor={risco.disjuntorAtivo ? 'armado' : 'desarmado'}
             tom={risco.disjuntorAtivo ? 'ok' : 'ruim'} />
+          <Sinal rot="Pior caso" valor={din(risco.piorCasoGlobal())}
+            tom={risco.piorCasoGlobal() >= risco.piso ? 'ok' : 'ruim'} />
+          <Sinal rot="Caixa" valor={din(risco.caixa)} tom={risco.caixa > 0 ? 'ok' : 'ruim'} />
           <Sinal rot="Quebras" valor={String(quebras)} tom={quebras > 0 ? 'ruim' : 'ok'} />
         </div>
       </div>
@@ -204,6 +209,8 @@ export function TorreDeControle({ livro, torre, motores, auditoria, aoMexer }: P
           apaga o que estiver sendo digitado nos campos. A tela le os
           objetos vivos a cada render, entao o re-render normal ja basta. */}
       <div className="tc-corpo">
+        {aba === 'cobertura' && <PainelCobertura livro={livro} torre={torre} refazer={refazer} />}
+
         {aba === 'risco' && (
           <>
             <Bloco titulo="Limites"
@@ -674,6 +681,130 @@ function PainelAuditoria({ auditoria, livro }: { auditoria: Auditoria; livro: Li
           ))}
           {livro.razao.total === 0 && <p className="tc-vazio">Nada lançado ainda.</p>}
         </div>
+      </Bloco>
+    </>
+  )
+}
+
+/* ------------------------------------------------------------- cobertura */
+
+const MODOS: Array<{ id: ModoCobertura; nome: string; nota: string }> = [
+  { id: 'estrita', nome: 'Estrita',
+    nota: 'nenhum tick de liquidação pode ficar negativo em cenário nenhum. Garantia absoluta — e a mais dura: sem alguém do outro lado, a ordem não entra.' },
+  { id: 'caixa', nome: 'Pelo caixa',
+    nota: 'a casa aceita perder, no pior caso somado de tudo que está aberto, até uma fração do que ela tem. Nunca perde mais que a banca declarada.' },
+  { id: 'desligada', nome: 'Desligada',
+    nota: 'aceita tudo e torce. É o comportamento antigo, e é o único jeito de a casa quebrar.' },
+]
+
+function PainelCobertura({ livro, torre, refazer }: { livro: Livro; torre: Torre; refazer: () => void }) {
+  const risco = livro.risco
+  const c = risco.cobertura
+  const buckets = risco.livroDeCenarios()
+  const pior = risco.piorCasoGlobal()
+  const piso = risco.piso
+  const folga = Number.isFinite(piso) ? pior - piso : Infinity
+
+  return (
+    <>
+      <Bloco titulo="A trava" tom={c.modo === 'desligada' ? 'quebra' : undefined}
+        nota="Em opção binária de dígito o futuro tem dez saídas, não infinitas. A casa não precisa estimar risco: ela calcula o resultado exato de cada saída antes de aceitar a ordem, e recusa a que a deixaria no vermelho. Não é sorte — é a aposta que quebraria a casa nunca ter entrado.">
+        <div className="tc-modos">
+          {MODOS.map((m) => (
+            <button key={m.id} className={`tc-modo ${c.modo === m.id ? 'on' : ''} ${m.id === 'desligada' ? 'perigo' : ''}`}
+              onClick={() => { torre.definirModoDeCobertura(m.id); refazer() }}>
+              <b>{m.nome}</b>
+              <em>{m.nota}</em>
+            </button>
+          ))}
+        </div>
+
+        {c.modo === 'caixa' && (
+          <>
+            <Linha nome="Banca declarada" nota="o que a casa aceita pôr em risco. Somada ao lucro já realizado, forma o caixa.">
+              <Numero valor={c.banca} passo={100} min={0} largura={120}
+                aoConfirmar={(n) => { torre.definirBanca(n); refazer() }} />
+            </Linha>
+            <Linha nome="Fração do caixa em risco"
+              nota="quanto do caixa pode estar comprometido no pior cenário de tudo que está aberto ao mesmo tempo">
+              <input className="tc-slider" type="range" min={1} max={100} step={1}
+                value={Math.round(c.fracaoDoCaixa * 100)}
+                onChange={(e) => { torre.definirFracaoDoCaixa(Number(e.target.value) / 100); refazer() }} />
+              <span className="tc-valor">{(c.fracaoDoCaixa * 100).toFixed(0)}%</span>
+            </Linha>
+          </>
+        )}
+
+        <div className="tc-medidor">
+          <div>
+            <span className="rot">Caixa da casa</span>
+            <strong>{din(risco.caixa)}</strong>
+            <em>banca {din(c.banca)} + lucro {din(livro.livroDaCasa.resultado)}</em>
+          </div>
+          <div>
+            <span className="rot">Pior caso, tudo somado</span>
+            <strong className={pior < 0 ? 'ruim' : 'ok'}>{din(pior)}</strong>
+            <em>se todos os ticks abertos derem errado, um atrás do outro</em>
+          </div>
+          <div>
+            <span className="rot">Piso</span>
+            <strong>{Number.isFinite(piso) ? din(piso) : 'sem piso'}</strong>
+            <em>abaixo disto a ordem é recusada</em>
+          </div>
+          <div>
+            <span className="rot">Folga</span>
+            <strong className={folga > 0 ? 'ok' : 'ruim'}>
+              {Number.isFinite(folga) ? din(folga) : '∞'}
+            </strong>
+            <em>quanto ainda cabe antes de começar a recusar</em>
+          </div>
+        </div>
+
+        {Number.isFinite(piso) && (
+          <div className="tc-barra grande">
+            <i className={folga <= 0 ? 'perigo' : folga < Math.abs(piso) * 0.3 ? 'atencao' : ''}
+              style={{ width: `${Math.max(0, Math.min(1, Number.isFinite(piso) && piso !== 0 ? 1 - folga / Math.abs(piso) : 0)) * 100}%` }} />
+          </div>
+        )}
+      </Bloco>
+
+      <Bloco titulo="Os dez cenários de cada tick aberto"
+        nota="Cada linha é um tick de liquidação; cada célula, o resultado da casa se aquele dígito sair. Vermelho é onde a casa paga. Enquanto não houver vermelho, não existe cenário em que aquele tick tire dinheiro da casa.">
+        {buckets.length === 0 ? (
+          <p className="tc-vazio">Nenhum contrato aberto. Nada a cobrir.</p>
+        ) : (
+          <div className="tc-cenarios">
+            <div className="tc-cen-cab">
+              <span>tick</span>
+              {[0,1,2,3,4,5,6,7,8,9].map((d) => <span key={d}>{d}</span>)}
+              <span>pior</span>
+              <span>coberto</span>
+            </div>
+            {buckets.slice(0, 12).map((b) => {
+              const cs = cenarios(b.posicoes)
+              const escala = Math.max(...cs.map((x) => Math.abs(x.resultado)), 1)
+              const grau = grauDeCobertura(b.posicoes)
+              return (
+                <div key={`${b.instrumento}-${b.tick}`} className="tc-cen-linha">
+                  <span className="tc-cen-nome">{b.instrumento} · {b.tick}</span>
+                  {[0,1,2,3,4,5,6,7,8,9].map((d) => {
+                    const cen = cs.find((x) => x.digito === d)!
+                    const forca = Math.min(1, Math.abs(cen.resultado) / escala)
+                    return (
+                      <span key={d} className={`tc-cel ${cen.resultado < 0 ? 'ruim' : 'ok'}`}
+                        style={{ opacity: 0.28 + forca * 0.72 }}
+                        title={`dígito ${d}: ${din(cen.resultado)}`}>
+                        {din(cen.resultado)}
+                      </span>
+                    )
+                  })}
+                  <span className={`tc-cen-pior ${b.pior < 0 ? 'ruim' : 'ok'}`}>{din(b.pior)}</span>
+                  <span className="tc-cen-grau">{(grau * 100).toFixed(0)}%</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </Bloco>
     </>
   )

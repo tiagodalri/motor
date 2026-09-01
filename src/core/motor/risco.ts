@@ -1,4 +1,8 @@
 import type { Cotacao } from './precos'
+import {
+  COBERTURA_PADRAO, pisoDoCaixa, piorCaso,
+  type Cobertura, type Posicao,
+} from './cobertura'
 
 /**
  * Controle de risco da casa.
@@ -43,9 +47,13 @@ export const LIMITES_PADRAO: Limites = {
 
 export type Veredito =
   | { aceita: true }
-  | { aceita: false; motivo: string; camada: 'aposta' | 'cliente' | 'bucket' | 'disjuntor' }
+  | {
+      aceita: false
+      motivo: string
+      camada: 'aposta' | 'cliente' | 'bucket' | 'cobertura' | 'disjuntor'
+    }
 
-interface Aberto {
+interface Aberto extends Posicao {
   clienteId: string
   instrumento: string
   /** Tick em que este contrato liquida. É a chave do bucket. */
@@ -54,6 +62,13 @@ interface Aberto {
 }
 
 const chaveBucket = (instrumento: string, tick: number) => `${instrumento}#${tick}`
+
+const cenariosDe = (posicoes: Posicao[]) => {
+  const p = piorCaso(posicoes)
+  let melhor = 0
+  for (const x of posicoes) melhor += x.valor
+  return { pior: p?.resultado ?? 0, melhor: Number(melhor.toFixed(2)) }
+}
 const hoje = () => new Date().toISOString().slice(0, 10)
 
 export class Risco {
@@ -70,6 +85,14 @@ export class Risco {
   disjuntorAtivo = true
   /** Minutos de suspensão automática quando o disjuntor abre. */
   minutosDeSuspensao = 5
+  /**
+   * Política de cobertura: a quinta camada, e a única que dá **garantia**
+   * em vez de probabilidade. As quatro anteriores limitam o tamanho do
+   * estrago; esta decide se o estrago pode existir.
+   */
+  cobertura: Cobertura = { ...COBERTURA_PADRAO }
+  /** Lucro realizado da casa. O livro liga isto na razão. */
+  lucroDaCasa: () => number = () => 0
   private abertos = new Map<string, Aberto>()
   private perdaDoDia = new Map<string, number>()
   private sangria: Array<{ quando: number; valor: number }> = []
@@ -125,6 +148,24 @@ export class Risco {
         motivo: 'A casa já está exposta demais neste instante. Tente o próximo tick.' }
     }
 
+    // --- 5. cobertura: o pior cenário possível cabe no caixa?
+    if (this.cobertura.modo !== 'desligada') {
+      const nova: Posicao = {
+        tipo: cotacao.tipo, barreira: cotacao.barreira,
+        valor: cotacao.valor, pagamento: cotacao.pagamento,
+      }
+      const depois = this.piorCasoGlobal({ instrumento, tick: tickLiquidacao, posicao: nova })
+      const piso = this.piso
+      if (depois < piso) {
+        return {
+          aceita: false, camada: 'cobertura',
+          motivo: this.cobertura.modo === 'estrita'
+            ? 'Ainda não há do outro lado o suficiente para cobrir esta aposta. Tente um valor menor ou o próximo tick.'
+            : 'A casa já está com o caixa comprometido neste instante. Tente um valor menor ou o próximo tick.',
+        }
+      }
+    }
+
     return { aceita: true }
   }
 
@@ -150,6 +191,76 @@ export class Risco {
     this.sangria.push({ quando: Date.now(), valor: resultadoDaCasa })
     this.limparSangria()
     this.verificarDisjuntor(a.instrumento)
+  }
+
+  /* -------------------------------------------------------- cobertura */
+
+  /** Caixa da casa: a banca declarada mais o que ela já ganhou. */
+  get caixa(): number {
+    return Number((this.cobertura.banca + this.lucroDaCasa()).toFixed(2))
+  }
+
+  /** O pior caso somado nunca pode ficar abaixo disto. */
+  get piso(): number {
+    return pisoDoCaixa(this.cobertura, this.caixa)
+  }
+
+  /** Posições abertas de um bucket, no formato que a cobertura entende. */
+  posicoesDoBucket(instrumento: string, tick: number): Posicao[] {
+    const chave = chaveBucket(instrumento, tick)
+    const saida: Posicao[] = []
+    for (const a of this.abertos.values()) {
+      if (chaveBucket(a.instrumento, a.tickLiquidacao) === chave) {
+        saida.push({ tipo: a.tipo, barreira: a.barreira, valor: a.valor, pagamento: a.pagamento })
+      }
+    }
+    return saida
+  }
+
+  /** Todos os buckets abertos, com o pior caso de cada um. */
+  livroDeCenarios(): Array<{
+    instrumento: string; tick: number; posicoes: Posicao[]
+    pior: number; melhor: number
+  }> {
+    const mapa = new Map<string, { instrumento: string; tick: number; posicoes: Posicao[] }>()
+    for (const a of this.abertos.values()) {
+      const chave = chaveBucket(a.instrumento, a.tickLiquidacao)
+      const atual = mapa.get(chave)
+        ?? { instrumento: a.instrumento, tick: a.tickLiquidacao, posicoes: [] }
+      atual.posicoes.push({ tipo: a.tipo, barreira: a.barreira, valor: a.valor, pagamento: a.pagamento })
+      mapa.set(chave, atual)
+    }
+    return [...mapa.values()].map((b) => {
+      const cs = cenariosDe(b.posicoes)
+      return { ...b, pior: cs.pior, melhor: cs.melhor }
+    }).sort((x, y) => x.pior - y.pior)
+  }
+
+  /**
+   * A soma dos piores casos de todos os buckets abertos.
+   *
+   * Conservador de propósito: assume que todos dão errado, um atrás do
+   * outro. Eles liquidam em ticks diferentes, então isso é possível — e
+   * garantia que só vale "na média" não é garantia.
+   */
+  piorCasoGlobal(extra?: { instrumento: string; tick: number; posicao: Posicao }): number {
+    const porBucket = new Map<string, Posicao[]>()
+    const por = (chave: string, p: Posicao) => {
+      const lista = porBucket.get(chave) ?? []
+      lista.push(p)
+      porBucket.set(chave, lista)
+    }
+    for (const a of this.abertos.values()) {
+      por(chaveBucket(a.instrumento, a.tickLiquidacao),
+        { tipo: a.tipo, barreira: a.barreira, valor: a.valor, pagamento: a.pagamento })
+    }
+    if (extra) por(chaveBucket(extra.instrumento, extra.tick), extra.posicao)
+
+    let total = 0
+    for (const posicoes of porBucket.values()) {
+      total += piorCaso(posicoes)?.resultado ?? 0
+    }
+    return Number(total.toFixed(2))
   }
 
   exposicaoDoCliente(clienteId: string): number {

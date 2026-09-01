@@ -92,9 +92,9 @@ export class MotorDeTicks {
   }
 
   /** Abre a rodada. O hash pode ir para a tela na hora. */
-  async abrirRodada(sementeCliente = sementeNova()): Promise<Compromisso> {
+  async abrirRodada(sementeCliente = sementeNova(), sementeCasa?: string): Promise<Compromisso> {
     this.parar()
-    this.compromisso = await abrirCompromisso(sementeCliente)
+    this.compromisso = await abrirCompromisso(sementeCliente, sementeCasa)
     this.fluxo = await Fluxo.criar(this.compromisso.sementeCasa, sementeCliente)
     this.serie = []
     this.forcados = []
