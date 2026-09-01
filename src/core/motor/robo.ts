@@ -1,6 +1,7 @@
 import { OrdemRecusada, type Contrato, type Livro } from './livro'
 import { PARAMETROS, type TipoContrato } from './precos'
 import type { MotorDeTicks } from './ticks'
+import type { FonteDeSinal, Sinal } from './copiar'
 
 /**
  * Robôs de estratégia contra a casa própria.
@@ -117,6 +118,7 @@ export class Robo {
   private ouvintes = new Set<Ouvinte>()
   private soltarTick: (() => void) | null = null
   private soltarLivro: (() => void) | null = null
+  private ouvintesDeSinal = new Set<(s: Sinal) => void>()
 
   readonly estrategia: Estrategia
 
@@ -144,6 +146,19 @@ export class Robo {
 
   get instantaneo(): EstadoRobo {
     return { ...this.estado }
+  }
+
+  /**
+   * A fonte de sinal deste robô, para quem quiser copiá-lo.
+   *
+   * O sinal sai **depois** de a ordem do próprio robô ser aceita: copiar
+   * uma ordem que a casa recusou seria copiar uma intenção, não uma
+   * operação. E carrega a banca da origem, porque é ela que dá sentido a
+   * copiar proporcionalmente.
+   */
+  readonly sinais: FonteDeSinal = (aoSinal) => {
+    this.ouvintesDeSinal.add(aoSinal)
+    return () => this.ouvintesDeSinal.delete(aoSinal)
   }
 
   ligar(): void {
@@ -208,6 +223,12 @@ export class Robo {
       })
       this.abertos.add(contrato.id)
       this.estado.operacoes += 1
+      const sinal: Sinal = {
+        fonte: this.estrategia.id,
+        tipo: c.tipo, barreira: c.barreira, ticks: c.ticks,
+        valor, bancaDaFonte: this.livro.saldo(this.clienteId) + valor,
+      }
+      this.ouvintesDeSinal.forEach((fn) => { try { fn(sinal) } catch { /* ignora */ } })
     } catch (e) {
       // Recusa não é erro do robô: é a casa dizendo que não cobre esta
       // aposta agora. Ele espera o próximo tick e tenta de novo — a
