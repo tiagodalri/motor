@@ -99,7 +99,11 @@ export function PriceChart({ candles, mode, pipSize, symbolName, loading, marker
    */
   const futuroPx = plot.w * CHART.fatiaDoFuturo
   const areaSerie = Math.max(1, plot.w - futuroPx)
-  const stepX = Math.min(areaSerie / Math.max(1, vp.size), CHART.larguraMaxima * 1.75)
+  // Enquanto a série é menor que a janela, as velas se espalham até a
+  // largura máxima em vez de ficarem espremidas num canto — série curta
+  // fica curta, não fica minúscula.
+  const cabemNaJanela = Math.max(1, Math.min(vp.size, view.items.length || vp.size))
+  const stepX = Math.min(areaSerie / cabemNaJanela, CHART.larguraMaxima * 1.75)
   const xUltimo = plot.x + areaSerie - stepX / 2
   const toX = useCallback(
     (i: number) => xUltimo - (view.items.length - 1 - i) * stepX,
