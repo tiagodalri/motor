@@ -155,6 +155,7 @@ export function TorreDeControle({ livro, torre, motores, auditoria, pulso, aoMex
 
   return (
     <div className="tc">
+      <div className="tc-topo">
       <div className="tc-faixa">
         <div className="tc-faixa-nome">
           <b>Torre de controle</b>
@@ -192,6 +193,7 @@ export function TorreDeControle({ livro, torre, motores, auditoria, pulso, aoMex
           </button>
         ))}
       </nav>
+      </div>
 
       <div className="tc-corpo" key={pulso % 2}>
         {aba === 'risco' && (
@@ -649,7 +651,7 @@ function PainelAuditoria({ auditoria, livro }: { auditoria: Auditoria; livro: Li
 
       <Bloco titulo="Razão — últimos lançamentos"
         nota="Partidas dobradas. Cada linha soma zero; a soma de todas as contas também. Dinheiro não nasce nem some — e quando alguém tenta fazer nascer, é aqui que aparece.">
-        <div className="tc-log">
+        <div className="tc-log razao">
           {livro.razao.todos(40).map((l) => (
             <div key={l.id} className="tc-log-linha">
               <span className="tc-log-hora">{hora(l.quando)}</span>

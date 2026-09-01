@@ -2300,8 +2300,11 @@ button, input { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 24px;
   padding: 14px 24px; background: var(--tc-surface);
   border-bottom: 1px solid var(--tc-line);
-  position: sticky; top: 0; z-index: 5; flex-wrap: wrap;
+  flex-wrap: wrap;
 }
+/* faixa, alarme e abas grudam juntos: dois sticky em top:0 se escondem um
+   atras do outro, e a barra de abas some assim que a pagina rola */
+.tc-topo { position: sticky; top: 0; z-index: 6; background: var(--tc-surface); }
 .tc-faixa-nome b {
   display: block; font-size: 14px; font-weight: 650; letter-spacing: -.01em;
 }
@@ -2340,7 +2343,7 @@ button, input { font: inherit; color: inherit; }
 .tc-abas {
   display: flex; gap: 2px; padding: 0 18px;
   background: var(--tc-surface); border-bottom: 1px solid var(--tc-line);
-  position: sticky; top: 0; z-index: 4; overflow-x: auto;
+  overflow-x: auto;
 }
 .tc-abas button {
   border: 0; background: none; cursor: pointer; padding: 10px 14px 9px;
@@ -2532,6 +2535,9 @@ button, input { font: inherit; color: inherit; }
 }
 .tc-sistema .ok, .tc-soma .ok { color: var(--tc-ok); }
 .tc-sistema .ruim, .tc-soma .ruim { color: var(--tc-ruim); }
+
+/* a razao nao tem selo de peso: quatro colunas, nao cinco */
+.tc-log.razao .tc-log-linha { grid-template-columns: 62px 52px minmax(200px, 1fr) minmax(180px, auto); }
 
 /* ------------------------------------------------------------------ log */
 .tc-filtros { display: flex; gap: 5px; margin-bottom: 12px; flex-wrap: wrap; }
