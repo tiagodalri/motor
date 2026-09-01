@@ -26,6 +26,7 @@ interface Props {
   torre: Torre
   motores: Motores
   auditoria: Auditoria
+  /** Só existe para provocar o re-render a cada tick; não é lido. */
   pulso: number
   aoMexer: () => void
 }
@@ -140,7 +141,7 @@ function Bloco({ titulo, nota, children, tom }: {
 
 /* ------------------------------------------------------------------ tela */
 
-export function TorreDeControle({ livro, torre, motores, auditoria, pulso, aoMexer }: Props) {
+export function TorreDeControle({ livro, torre, motores, auditoria, aoMexer }: Props) {
   const [aba, setAba] = useState<Aba>('risco')
   const [, setEco] = useState(0)
   const refazer = () => { setEco((n) => n + 1); aoMexer() }
@@ -195,7 +196,11 @@ export function TorreDeControle({ livro, torre, motores, auditoria, pulso, aoMex
       </nav>
       </div>
 
-      <div className="tc-corpo" key={pulso % 2}>
+      {/* sem `key` variavel aqui: um key que muda a cada tick desmonta e
+          remonta a arvore inteira quatro vezes por segundo — trava a aba e
+          apaga o que estiver sendo digitado nos campos. A tela le os
+          objetos vivos a cada render, entao o re-render normal ja basta. */}
+      <div className="tc-corpo">
         {aba === 'risco' && (
           <>
             <Bloco titulo="Limites"
