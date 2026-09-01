@@ -3,6 +3,7 @@ import { PERFIS, historicoDemo, type HistoricoDemo, type Perfil } from '../core/
 import type { Copiador, ConfigCopia, EstadoCopia } from '../core/motor/copiar'
 import type { Robo } from '../core/motor/robo'
 import { PARAMETROS } from '../core/motor/precos'
+import { rankingDemo, type TraderDoRanking } from '../core/motor/ranking'
 
 /**
  * Copy trade.
@@ -95,16 +96,94 @@ export function TelaCopy({ traders, copiadores, saldo, aoMexer }: Props) {
         depois que você copia: aí a estratégia opera contra o livro da casa de verdade.
       </div>
 
-      <div className="copy-lista">
-        {ordenados.map((p) => (
-          <Cartao key={p.id} perfil={p} historico={historicos[p.id]}
-            trader={traders[p.id]} copiador={copiadores[p.id]}
-            saldo={saldo} aoMexer={aoMexer}
-            aberto={aberto === p.id}
-            aoAbrir={() => setAberto((a) => (a === p.id ? null : p.id))} />
-        ))}
+      <div className="copy-corpo">
+        <div className="copy-lista">
+          {ordenados.map((p) => (
+            <Cartao key={p.id} perfil={p} historico={historicos[p.id]}
+              trader={traders[p.id]} copiador={copiadores[p.id]}
+              saldo={saldo} aoMexer={aoMexer}
+              aberto={aberto === p.id}
+              aoAbrir={() => setAberto((a) => (a === p.id ? null : p.id))} />
+          ))}
+        </div>
+        <Ranking />
       </div>
     </div>
+  )
+}
+
+/* --------------------------------------------------------------- ranking */
+
+const pctCurto = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(0)}%`
+
+function Ranking() {
+  const todos = useMemo(() => rankingDemo(50), [])
+  const [busca, setBusca] = useState('')
+  const [uf, setUf] = useState<string>('todos')
+
+  const ufs = useMemo(
+    () => ['todos', ...[...new Set(todos.map((t) => t.uf))].sort()],
+    [todos],
+  )
+
+  const lista = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return todos.filter((t) => {
+      if (uf !== 'todos' && t.uf !== uf) return false
+      if (!q) return true
+      return t.nome.toLowerCase().includes(q) || t.apelido.toLowerCase().includes(q)
+    })
+  }, [todos, busca, uf])
+
+  return (
+    <aside className="rank">
+      <div className="rank-topo">
+        <div>
+          <b>Top 50 Brasil</b>
+          <em>retorno de 30 dias</em>
+        </div>
+        <span className="rank-selo">fictício</span>
+      </div>
+
+      <div className="rank-filtros">
+        <input placeholder="buscar trader" value={busca}
+          onChange={(e) => setBusca(e.target.value)} />
+        <select value={uf} onChange={(e) => setUf(e.target.value)}>
+          {ufs.map((u) => <option key={u} value={u}>{u === 'todos' ? 'BR' : u}</option>)}
+        </select>
+      </div>
+
+      <ol className="rank-lista">
+        {lista.map((t) => <Linha key={t.posicao} t={t} />)}
+        {lista.length === 0 && <p className="rank-vazio">Ninguém com esse filtro.</p>}
+      </ol>
+
+      <p className="rank-rodape">
+        Nomes e números gerados para esta maquete. Quando houver gente operando de
+        verdade, esta lista passa a sair dos contratos.
+      </p>
+    </aside>
+  )
+}
+
+function Linha({ t }: { t: TraderDoRanking }) {
+  const positivo = t.retorno30d >= 0
+  const medalha = t.posicao <= 3 ? `m${t.posicao}` : ''
+  return (
+    <li className={`rank-linha ${medalha}`}>
+      <span className="rank-pos">{t.posicao}</span>
+      <span className="rank-quem">
+        <b>{t.nome}</b>
+        <em>{t.apelido} · {t.uf} · {t.ativo}</em>
+      </span>
+      <span className="rank-num">
+        <b className={positivo ? 'up' : 'down'}>{pctCurto(t.retorno30d)}</b>
+        <em>{t.seguidores.toLocaleString('pt-BR')} seg.</em>
+      </span>
+      <span className={`rank-var ${t.variacao > 0 ? 'up' : t.variacao < 0 ? 'down' : ''}`}>
+        {t.variacao > 0 ? `▲${t.variacao}` : t.variacao < 0 ? `▼${Math.abs(t.variacao)}` : '–'}
+      </span>
+    </li>
   )
 }
 

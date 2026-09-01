@@ -14,6 +14,7 @@
  * Rodar com:  npm run testes
  */
 import { PERFIS, historicoDemo, perfilPorId } from '../src/core/motor/estrategias'
+import { rankingDemo } from '../src/core/motor/ranking'
 import { digitosQuePagam, probabilidade } from '../src/core/motor/precos'
 
 const falhas: string[] = []
@@ -76,8 +77,23 @@ function principal() {
       `   ${h.operacoes.toLocaleString('pt-BR')} operações`)
   }
 
+  console.log('\n5. o ranking de vitrine')
+  const rk = rankingDemo(50)
+  checar('devolve sempre o mesmo ranking', igual(rk, rankingDemo(50)))
+  checar('cinquenta posições, sem buraco',
+    rk.length === 50 && rk.every((t, i) => t.posicao === i + 1))
+  checar('todo mundo marcado como simulado', rk.every((t) => t.simulado === true))
+  checar('nenhum nome completo — só nome e inicial',
+    rk.every((t) => /^[^ ]+ [A-Z]\.$/.test(t.nome)))
+  checar('os apelidos e nomes não se repetem',
+    new Set(rk.map((t) => t.nome)).size === 50)
+  checar('o retorno cai do topo para a cauda', rk[0].retorno30d > rk[49].retorno30d)
+  checar('tem gente no vermelho na cauda', rk.some((t) => t.retorno30d < 0))
+  checar('o acerto fica em faixa plausível',
+    rk.every((t) => t.acerto > 0.2 && t.acerto < 0.6))
+
   console.log(falhas.length === 0
-    ? '\nO catálogo confere e o histórico é reprodutível.'
+    ? '\nO catálogo confere, o histórico é reprodutível e o ranking também.'
     : `\n${falhas.length} falha(s): ${falhas.join(' · ')}`)
   if (falhas.length > 0) process.exit(1)
 }

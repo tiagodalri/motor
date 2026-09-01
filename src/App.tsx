@@ -4,6 +4,7 @@ import { PainelCasa } from './components/PainelCasa'
 import { TorreDeControle } from './components/TorreDeControle'
 import { PainelRobos } from './components/PainelRobos'
 import { TelaCopy } from './components/TelaCopy'
+import { TelaCaixa } from './components/TelaCaixa'
 import { Brand } from './components/Brand'
 import { useMotor } from './hooks/useMotor'
 import { OrdemRecusada } from './core/motor/livro'
@@ -31,7 +32,7 @@ type Modalidade = 'digitos' | 'direcao'
 
 export default function App() {
   const m = useMotor()
-  const [tela, setTela] = useState<'operar' | 'copy' | 'casa' | 'torre'>('operar')
+  const [tela, setTela] = useState<'operar' | 'copy' | 'caixa' | 'casa' | 'torre'>('operar')
   const [modalidade, setModalidade] = useState<Modalidade>('digitos')
   const [tipo, setTipo] = useState<TipoContrato>('DIGITO_ACIMA')
   const [barreira, setBarreira] = useState(5)
@@ -111,6 +112,7 @@ export default function App() {
         <nav className="telas">
           <button className={tela === 'operar' ? 'on' : ''} onClick={() => setTela('operar')}>Operar</button>
           <button className={tela === 'copy' ? 'on' : ''} onClick={() => setTela('copy')}>Copy trade</button>
+          <button className={tela === 'caixa' ? 'on' : ''} onClick={() => setTela('caixa')}>Caixa</button>
           <button className={tela === 'casa' ? 'on' : ''} onClick={() => setTela('casa')}>Livro da casa</button>
           <button className={tela === 'torre' ? 'on' : ''} onClick={() => setTela('torre')}>Torre de controle</button>
         </nav>
@@ -118,10 +120,11 @@ export default function App() {
           <button className="prova-botao" onClick={() => setVerProva((v) => !v)}>
             Prova de honestidade
           </button>
-          <div className="conta-chip demo">
+          <button className="conta-chip demo" onClick={() => setTela('caixa')}
+            title="Ir para o caixa">
             <span className="selo demo">Fictício</span>
             <b>{din(m.saldo)}</b>
-          </div>
+          </button>
         </div>
       </header>
 
@@ -146,6 +149,8 @@ export default function App() {
       ) : tela === 'copy' ? (
         <TelaCopy traders={m.traders} copiadores={m.copiadores}
           saldo={m.saldo} aoMexer={m.atualizar} />
+      ) : tela === 'caixa' ? (
+        <TelaCaixa livro={m.livro} clienteId={m.cliente} saldo={m.saldo} aoMexer={m.atualizar} />
       ) : tela === 'casa' ? (
         <PainelCasa livro={m.livro} instrumento={m.instrumento.codigo} />
       ) : (
