@@ -82,7 +82,7 @@ function Numero({ valor, aoConfirmar, passo = 1, min, sufixo, largura = 110 }: {
   useEffect(() => { setTexto(Number.isFinite(valor) ? String(valor) : '') }, [valor])
 
   return (
-    <span className="tc-numero" style={{ width: largura }}>
+    <span className={`tc-numero ${sufixo ? 'com-sufixo' : ''}`} style={{ width: largura }}>
       <input
         type="number" step={passo} min={min}
         value={texto}

@@ -214,7 +214,7 @@ export class Torre {
   async verificar(codigo: string): Promise<{ ok: boolean; conferidos: number; primeiraDivergencia: number | null }> {
     const motor = this.motores()[codigo]
     if (!motor) return { ok: false, conferidos: 0, primeiraDivergencia: null }
-    const c = motor.revelarAgora()
+    const c = motor.compromissoInterno
     const servida = motor.historico(5_000)
     if (!c || servida.length === 0) return { ok: false, conferidos: 0, primeiraDivergencia: null }
 

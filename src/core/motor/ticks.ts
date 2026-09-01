@@ -132,6 +132,18 @@ export class MotorDeTicks {
     return this.compromisso
   }
 
+  /**
+   * Leitura interna do compromisso, para a casa conferir a própria série.
+   *
+   * Não é revelação: nada sai desta máquina. Confundir as duas coisas faz
+   * a torre marcar a rodada como adulterada só porque alguém apertou
+   * "conferir" — e um alarme que dispara sozinho é um alarme que ninguém
+   * olha mais.
+   */
+  get compromissoInterno(): Compromisso | null {
+    return this.compromisso
+  }
+
   /** Quantos ticks a rodada já produziu. */
   get tamanhoDaSerie(): number {
     return this.serie.length

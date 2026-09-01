@@ -2404,6 +2404,9 @@ button, input { font: inherit; color: inherit; }
   font-family: var(--tc-mono); font-size: 12px; font-variant-numeric: tabular-nums;
   text-align: right;
 }
+/* com sufixo, o numero precisa de folga: os dois sao alinhados a direita
+   e sem isso o valor fica por baixo da unidade */
+.tc-numero.com-sufixo input { padding-right: 32px; }
 .tc-numero input::placeholder { color: var(--tc-ambar); opacity: 1; font-size: 14px; }
 .tc-numero input:focus { outline: 0; border-color: var(--tc-ambar); }
 .tc-numero em {
