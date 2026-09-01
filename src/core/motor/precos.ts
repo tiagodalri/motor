@@ -57,8 +57,30 @@ export const MARGEM: Record<TipoContrato, number> = {
   DESCER: 0.08,
 }
 
-/** Quanto tempo uma cotação vale. Cotação que não expira é opção de graça. */
-const VALIDADE_MS = 5_000
+/**
+ * Parâmetros ajustáveis em tempo de execução pela torre de controle.
+ *
+ * Eram constantes de módulo. Viraram estado porque a casa precisa poder
+ * mexer na margem sem publicar uma versão nova — e porque, para decidir o
+ * que deve ficar travado, primeiro é preciso ver o que acontece quando
+ * está solto.
+ */
+export const PARAMETROS = {
+  /** Quanto tempo uma cotação vale. Cotação que não expira é opção de graça. */
+  validadeMs: 5_000,
+  /**
+   * Aceita apostas? Chave geral de cotação — desliga a casa sem derrubar
+   * o motor de preço.
+   */
+  aceitandoOrdens: true,
+  /** Piso e teto do valor de uma aposta, do lado da cotação. */
+  valorMinimo: 0.35,
+  /** Duração máxima em ticks. */
+  ticksMaximo: 10,
+}
+
+/** Margem padrão de fábrica — o ponto de retorno quando o teste azedar. */
+export const MARGEM_PADRAO: Record<TipoContrato, number> = { ...MARGEM }
 
 /**
  * Chance real de ganhar.
@@ -127,7 +149,7 @@ export function cotar(pedido: PedidoCotacao): Cotacao {
     margem,
     // se o cliente ganhar, a casa devolve o pagamento e fica sem a entrada
     exposicao: Number((pagamento - pedido.valor).toFixed(2)),
-    valeAte: Date.now() + VALIDADE_MS,
+    valeAte: Date.now() + PARAMETROS.validadeMs,
   }
 }
 

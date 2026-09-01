@@ -2,13 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { INSTRUMENTOS, MotorDeTicks, type Instrumento, type Tick } from '../core/motor/ticks'
 import { Livro, type Contrato } from '../core/motor/livro'
 import { Razao } from '../core/motor/razao'
+import { Torre, type Motores } from '../core/motor/torre'
+import { auditoria } from '../core/motor/auditoria'
 
 /**
  * Liga o motor à interface.
  *
- * Um motor de tick por instrumento, um livro só. A liquidação é disparada
- * pelo evento de tick — o mesmo evento que atualiza o gráfico liquida os
- * contratos. É de propósito: nunca há um contrato "esperando o relógio".
+ * Um motor de tick **por instrumento**, todos rodando ao mesmo tempo, e um
+ * livro só. Antes só existia o instrumento que estava na tela; a torre de
+ * controle precisa da casa inteira — exposição de V10 e de V100 somam no
+ * mesmo caixa, e um disjuntor que só existe onde alguém está olhando não é
+ * um disjuntor.
+ *
+ * A liquidação é disparada pelo evento de tick — o mesmo evento que
+ * atualiza o gráfico liquida os contratos. É de propósito: nunca há um
+ * contrato "esperando o relógio".
  */
 
 const CLIENTE = 'eu'
@@ -33,17 +41,20 @@ export function useMotor() {
   const [pulso, setPulso] = useState(0)
 
   const livroRef = useRef<Livro | null>(null)
-  const motorRef = useRef<MotorDeTicks | null>(null)
+  const motoresRef = useRef<Motores>({})
+  const torreRef = useRef<Torre | null>(null)
+  const ativoRef = useRef<string>(instrumento.codigo)
 
-  // livro único, criado uma vez
   if (!livroRef.current) {
     const razao = razaoGuardada()
     const livro = new Livro(razao)
     // primeira visita ganha uma banca fictícia para experimentar
     if (razao.total === 0) livro.depositar(CLIENTE, 1000, 'deposito-inicial')
     livroRef.current = livro
+    torreRef.current = new Torre(livro, () => motoresRef.current)
   }
   const livro = livroRef.current
+  const torre = torreRef.current!
 
   const atualizar = useCallback(() => {
     setSaldo(livro.saldo(CLIENTE))
@@ -55,35 +66,55 @@ export function useMotor() {
     } catch { /* sem armazenamento: a sessao vale so enquanto a aba viver */ }
   }, [livro])
 
-  // troca de instrumento = rodada nova, com compromisso novo
+  // um motor por instrumento, criados uma vez e vivos enquanto a aba viver
+  const iniciadoRef = useRef(false)
   useEffect(() => {
-    let vivo = true
-    motorRef.current?.parar()
-    const motor = new MotorDeTicks(instrumento)
-    motorRef.current = motor
-    setTicks([]); setUltimo(null)
+    // sem desmontagem de propósito: os motores acompanham a aba, não o
+    // componente. O StrictMode monta duas vezes em desenvolvimento e uma
+    // rodada abortada no meio deixaria um instrumento mudo para sempre.
+    if (iniciadoRef.current) return
+    iniciadoRef.current = true
 
     void (async () => {
-      const compromisso = await motor.abrirRodada()
-      if (!vivo) return
-      setProva({ hash: compromisso.hash, sementeCliente: compromisso.sementeCliente })
-      motor.escutar((t) => {
-        setUltimo(t)
-        setTicks((antes) => [...antes, t].slice(-600))
-        // o mesmo tick que move o gráfico liquida os contratos
-        if (livro.liquidarTick(t).length > 0) atualizar()
-      })
-      motor.ligar()
+      for (const i of INSTRUMENTOS) {
+        const motor = new MotorDeTicks(i)
+        motoresRef.current[i.codigo] = motor
+        const compromisso = await motor.abrirRodada()
+        if (i.codigo === ativoRef.current) {
+          setProva({ hash: compromisso.hash, sementeCliente: compromisso.sementeCliente })
+        }
+        motor.escutar((t) => {
+          if (t.instrumento === ativoRef.current) {
+            setUltimo(t)
+            setTicks((antes) => [...antes, t].slice(-600))
+          }
+          // o mesmo tick que move o gráfico liquida os contratos
+          if (livro.liquidarTick(t).length > 0) atualizar()
+          else setPulso((n) => n + 1)
+        })
+        motor.ligar()
+      }
     })()
+  }, [livro, atualizar])
 
-    return () => { vivo = false; motor.parar() }
-  }, [instrumento, livro, atualizar])
+  // trocar de instrumento é só trocar o que a tela olha: os outros seguem
+  // rodando, e a casa continua exposta a eles
+  useEffect(() => {
+    ativoRef.current = instrumento.codigo
+    const motor = motoresRef.current[instrumento.codigo]
+    setTicks(motor?.historico(600) ?? [])
+    setUltimo(motor?.ultimo ?? null)
+    const p = motor?.provaPublica
+    setProva(p ? { hash: p.hash, sementeCliente: p.sementeCliente } : null)
+  }, [instrumento])
 
   useEffect(() => { atualizar() }, [atualizar])
 
   return {
     instrumento, setInstrumento, instrumentos: INSTRUMENTOS,
-    motor: motorRef.current, livro, cliente: CLIENTE,
+    motor: motoresRef.current[instrumento.codigo] ?? null,
+    motores: motoresRef.current,
+    livro, torre, auditoria, cliente: CLIENTE,
     ticks, ultimo, abertos, historico, saldo, prova, pulso, atualizar,
   }
 }

@@ -63,12 +63,29 @@ type Ouvinte = (t: Tick) => void
  * da casa só pode ser revelada quando ninguém mais vai apostar sobre ela.
  */
 export class MotorDeTicks {
-  readonly instrumento: Instrumento
+  /**
+   * Deixou de ser `readonly`: a torre de controle ajusta volatilidade,
+   * intervalo e casas decimais com o motor rodando. O objeto é o mesmo que
+   * está em INSTRUMENTOS, então a edição vale para a lista inteira.
+   */
+  instrumento: Instrumento
   private fluxo: Fluxo | null = null
   private compromisso: Compromisso | null = null
   private serie: Tick[] = []
   private ouvintes = new Set<Ouvinte>()
   private relogio: ReturnType<typeof setInterval> | null = null
+  /** Fila de dígitos forçados pela torre. Cada um vale para um tick. */
+  private forcados: number[] = []
+  /**
+   * Uma vez verdadeiro, não volta atrás sem abrir rodada nova.
+   *
+   * Marca que algum tick desta rodada não é mais função pura das sementes.
+   * A prova de honestidade continua sendo publicada, mas deixaria de bater
+   * na verificação do cliente — então a tela precisa dizer isso na cara.
+   */
+  adulterada = false
+  /** Multiplicador de velocidade da rodada. 1 = tempo real. */
+  velocidade = 1
 
   constructor(instrumento: Instrumento) {
     this.instrumento = instrumento
@@ -80,6 +97,9 @@ export class MotorDeTicks {
     this.compromisso = await abrirCompromisso(sementeCliente)
     this.fluxo = await Fluxo.criar(this.compromisso.sementeCasa, sementeCliente)
     this.serie = []
+    this.forcados = []
+    // rodada nova é a única coisa que limpa a marca de adulteração
+    this.adulterada = false
     return this.compromisso
   }
 
@@ -99,15 +119,94 @@ export class MotorDeTicks {
     return this.compromisso
   }
 
+  /**
+   * Revela com a rodada aberta.
+   *
+   * Quem conhece a semente da casa e a do cliente calcula todos os preços
+   * que ainda vão sair. Vazar isto com apostas em aberto é entregar o
+   * jogo — a torre só oferece porque o pedido foi ver tudo solto, e o
+   * chamador é obrigado a registrar como quebra.
+   */
+  revelarAgora(): Compromisso | null {
+    if (this.serie.length > 0) this.adulterada = true
+    return this.compromisso
+  }
+
+  /** Quantos ticks a rodada já produziu. */
+  get tamanhoDaSerie(): number {
+    return this.serie.length
+  }
+
   ligar(): void {
     if (this.relogio || !this.fluxo) return
     this.gerar()
-    this.relogio = setInterval(() => this.gerar(), this.instrumento.intervalo * 1000)
+    this.agendar()
   }
 
   parar(): void {
     if (this.relogio) clearInterval(this.relogio)
     this.relogio = null
+  }
+
+  get rodando(): boolean {
+    return this.relogio !== null
+  }
+
+  /** Gera exatamente um tick, esteja o motor parado ou andando. */
+  passo(): Tick | null {
+    if (!this.fluxo) return null
+    this.gerar()
+    return this.ultimo
+  }
+
+  /**
+   * Ajusta o instrumento com o motor de pé.
+   *
+   * Mudar volatilidade no meio da rodada muda a série a partir daqui — os
+   * ticks anteriores continuam válidos, os próximos não são mais
+   * reproduzíveis pelos parâmetros publicados. Por isso conta como
+   * adulteração e quem chama precisa saber disso.
+   */
+  ajustar(patch: Partial<Instrumento>, marcarAdulterada = true): void {
+    const mudouAlgoDaSerie =
+      (patch.volatilidade !== undefined && patch.volatilidade !== this.instrumento.volatilidade) ||
+      (patch.casas !== undefined && patch.casas !== this.instrumento.casas)
+    Object.assign(this.instrumento, patch)
+    if (mudouAlgoDaSerie && marcarAdulterada && this.serie.length > 0) this.adulterada = true
+    if (this.relogio) { clearInterval(this.relogio); this.agendar() }
+  }
+
+  definirVelocidade(v: number): void {
+    this.velocidade = Math.max(0.1, Math.min(50, v))
+    if (this.relogio) { clearInterval(this.relogio); this.agendar() }
+  }
+
+  /**
+   * Força o último dígito dos próximos ticks.
+   *
+   * Isto existe para exercitar caminhos de liquidação que a sorte levaria
+   * horas para produzir — dez perdas seguidas, o bucket estourando, o
+   * disjuntor abrindo. É também, literalmente, a alavanca de fraudar o
+   * jogo. Ela suja a rodada de forma permanente e visível de propósito:
+   * num sistema com dinheiro real, esta função não deveria existir em
+   * produção, e sim num ambiente de testes com as mesmas sementes.
+   */
+  forcarDigitos(digitos: number[]): void {
+    this.forcados.push(...digitos.map((d) => Math.max(0, Math.min(9, Math.round(d)))))
+    this.adulterada = true
+  }
+
+  limparForcados(): void {
+    this.forcados = []
+  }
+
+  get forcadosPendentes(): number[] {
+    return [...this.forcados]
+  }
+
+  private agendar(): void {
+    const ms = Math.max(50, (this.instrumento.intervalo * 1000) / this.velocidade)
+    this.relogio = setInterval(() => this.gerar(), ms)
   }
 
   escutar(fn: Ouvinte): () => void {
@@ -137,13 +236,18 @@ export class MotorDeTicks {
     let preco = instrumento.inicial
     const saida: Tick[] = []
     for (let n = 1; n <= quantos; n += 1) {
-      preco = preco * Math.exp(ajuste + passo * fluxo.normal())
-      const arredondado = Number(preco.toFixed(instrumento.casas))
+      // Compõe a partir do preço JÁ ARREDONDADO, exatamente como `gerar`.
+      // Compor do valor cheio e arredondar só na saída daria uma série
+      // parecida e diferente: as duas divergem devagar, e a verificação do
+      // cliente falharia sem que ninguém tivesse mexido em nada. O preço
+      // publicado é o preço arredondado — então é ele que entra no próximo
+      // passo, aqui e lá.
+      preco = Number((preco * Math.exp(ajuste + passo * fluxo.normal())).toFixed(instrumento.casas))
       saida.push({
         n,
         instrumento: instrumento.codigo,
-        preco: arredondado,
-        digito: ultimoDigito(arredondado, instrumento.casas),
+        preco,
+        digito: ultimoDigito(preco, instrumento.casas),
         epoch: 0,
       })
     }
@@ -158,7 +262,16 @@ export class MotorDeTicks {
     const bruto = anterior * Math.exp(
       -0.5 * i.volatilidade ** 2 * dt + i.volatilidade * Math.sqrt(dt) * this.fluxo.normal(),
     )
-    const preco = Number(bruto.toFixed(i.casas))
+    let preco = Number(bruto.toFixed(i.casas))
+
+    // dígito forçado pela torre: mexe só na última casa, o resto do preço
+    // continua sendo o que o browniano produziu
+    const forcado = this.forcados.shift()
+    if (forcado !== undefined) {
+      const texto = preco.toFixed(i.casas)
+      preco = Number(texto.slice(0, -1) + String(forcado))
+    }
+
     const tick: Tick = {
       n: this.serie.length + 1,
       instrumento: i.codigo,

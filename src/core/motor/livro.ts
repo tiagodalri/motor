@@ -1,6 +1,6 @@
 import { CONTA, Razao } from './razao'
 import { Risco, LIMITES_PADRAO, type Limites, type Veredito } from './risco'
-import { cotar, ganhou, type Cotacao, type PedidoCotacao, type TipoContrato } from './precos'
+import { PARAMETROS, cotar, ganhou, type Cotacao, type PedidoCotacao, type TipoContrato } from './precos'
 import type { MotorDeTicks, Tick } from './ticks'
 
 /**
@@ -46,8 +46,10 @@ export interface Contrato {
 }
 
 export class OrdemRecusada extends Error {
-  constructor(public veredito: Extract<Veredito, { aceita: false }>) {
+  veredito: Extract<Veredito, { aceita: false }>
+  constructor(veredito: Extract<Veredito, { aceita: false }>) {
     super(veredito.motivo)
+    this.veredito = veredito
   }
 }
 
@@ -102,6 +104,20 @@ export class Livro {
     const { clienteId, motor, cotacao } = args
     const instrumento = motor.instrumento.codigo
     const agora = motor.ultimo
+    if (!PARAMETROS.aceitandoOrdens) {
+      throw new OrdemRecusada({
+        aceita: false, camada: 'disjuntor',
+        motivo: 'A casa está com a cotação fechada no momento.',
+      })
+    }
+    if (cotacao.valor < PARAMETROS.valorMinimo) {
+      throw new OrdemRecusada({ aceita: false, camada: 'aposta',
+        motivo: `O valor mínimo é ${PARAMETROS.valorMinimo}.` })
+    }
+    if (cotacao.ticks > PARAMETROS.ticksMaximo) {
+      throw new OrdemRecusada({ aceita: false, camada: 'aposta',
+        motivo: `A duração máxima é ${PARAMETROS.ticksMaximo} ticks.` })
+    }
     if (!agora) throw new Error('O mercado ainda não abriu.')
     if (Date.now() > cotacao.valeAte) throw new Error('A cotação venceu. Peça outra.')
 
@@ -202,6 +218,107 @@ export class Livro {
       this.avisar(c)
     }
     return liquidados
+  }
+
+  /** Saque: dinheiro sai para o lado externo. */
+  sacar(clienteId: string, valor: number, chave = `saq-${Date.now()}-${clienteId}`): void {
+    if (valor <= 0) throw new Error('Valor de saque tem de ser positivo.')
+    if (this.saldo(clienteId) < valor) throw new Error('Saldo insuficiente para o saque.')
+    this.razao.lancar(chave, `Saque de ${clienteId}`, [
+      { conta: CONTA.cliente(clienteId), valor: -valor },
+      { conta: CONTA.deposito, valor },
+    ])
+  }
+
+  /**
+   * Ajuste manual: a casa credita ou debita um cliente por decisão humana.
+   *
+   * Existe em toda plataforma real (estorno, cortesia, correção de bug) e é
+   * a operação mais perigosa do sistema — move dinheiro sem que nenhuma
+   * regra tenha sido aplicada. Continua sendo partida dobrada: sai da conta
+   * da casa, entra na do cliente. O livro fecha; o que muda é de quem é o
+   * dinheiro. É por isso que ela precisa de motivo obrigatório.
+   */
+  ajustarManual(clienteId: string, valor: number, motivo: string,
+    chave = `aj-${Date.now()}-${clienteId}`): void {
+    if (!motivo.trim()) throw new Error('Ajuste manual exige motivo.')
+    if (valor === 0) throw new Error('Ajuste de zero não faz nada.')
+    this.razao.lancar(chave, `Ajuste manual · ${clienteId} · ${motivo}`, [
+      { conta: CONTA.casa, valor: -valor },
+      { conta: CONTA.cliente(clienteId), valor },
+    ])
+  }
+
+  /**
+   * Cancela um contrato aberto e devolve a entrada.
+   *
+   * O contrato some do livro como se nunca tivesse acontecido — sem
+   * resultado, sem margem. Serve para erro operacional; usado com o
+   * mercado andando, é a casa escolhendo desfazer as apostas que estão
+   * indo mal para ela.
+   */
+  cancelar(contratoId: string, motivo: string): Contrato {
+    const c = this.contratos.get(contratoId)
+    if (!c) throw new Error(`Contrato ${contratoId} não existe.`)
+    if (c.ganhou !== null) throw new Error(`Contrato ${contratoId} já liquidou.`)
+
+    this.razao.lancar(`can-${contratoId}`, `Cancelamento ${contratoId} · ${motivo}`, [
+      { conta: CONTA.emJogo, valor: -c.valor },
+      { conta: CONTA.cliente(c.clienteId), valor: c.valor },
+    ])
+
+    this.porTick.get(`${c.instrumento}#${c.tickLiquidacao}`)?.delete(contratoId)
+    this.risco.fechar(contratoId, 0)
+    this.contratos.delete(contratoId)
+    return c
+  }
+
+  /**
+   * Liquida um contrato aberto com o resultado escolhido a dedo.
+   *
+   * Não consulta o tick. É a alavanca para exercitar caminhos de
+   * liquidação sem esperar o mercado — e, sem cerimônia nenhuma, é
+   * decidir quem ganha. Quem chama registra como quebra.
+   */
+  liquidarForcado(contratoId: string, venceu: boolean, motivo: string): Contrato {
+    const c = this.contratos.get(contratoId)
+    if (!c) throw new Error(`Contrato ${contratoId} não existe.`)
+    if (c.ganhou !== null) throw new Error(`Contrato ${contratoId} já liquidou.`)
+
+    c.ganhou = venceu
+    c.encerradoEm = Date.now()
+    c.resultado = venceu ? Number((c.pagamento - c.valor).toFixed(2)) : -c.valor
+
+    if (venceu) {
+      this.razao.lancar(`liq-${contratoId}`, `Liquidação forçada ${contratoId} · ${motivo}`, [
+        { conta: CONTA.emJogo, valor: -c.valor },
+        { conta: CONTA.casa, valor: -(c.pagamento - c.valor) },
+        { conta: CONTA.cliente(c.clienteId), valor: c.pagamento },
+      ])
+    } else {
+      this.razao.lancar(`liq-${contratoId}`, `Liquidação forçada ${contratoId} · ${motivo}`, [
+        { conta: CONTA.emJogo, valor: -c.valor },
+        { conta: CONTA.casa, valor: c.valor },
+      ])
+    }
+
+    this.porTick.get(`${c.instrumento}#${c.tickLiquidacao}`)?.delete(contratoId)
+    this.risco.fechar(contratoId, -(c.resultado ?? 0))
+    this.avisar(c)
+    return c
+  }
+
+  /** Todos os clientes com movimento na razão. */
+  clientes(): Array<{ id: string; saldo: number }> {
+    return this.razao.contas()
+      .filter((c) => c.startsWith('cliente:'))
+      .map((c) => ({ id: c.slice('cliente:'.length), saldo: this.razao.saldo(c) }))
+      .sort((a, b) => b.saldo - a.saldo)
+  }
+
+  /** Tudo que está aberto na casa inteira, de todos os clientes. */
+  get todosAbertos(): Contrato[] {
+    return [...this.contratos.values()].filter((c) => c.ganhou === null)
   }
 
   abertos(clienteId?: string): Contrato[] {

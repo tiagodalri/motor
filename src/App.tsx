@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PriceChart } from './components/PriceChart'
 import { PainelCasa } from './components/PainelCasa'
+import { TorreDeControle } from './components/TorreDeControle'
 import { Brand } from './components/Brand'
 import { useMotor } from './hooks/useMotor'
 import { OrdemRecusada } from './core/motor/livro'
@@ -25,7 +26,7 @@ const assinado = (v: number) => `${v >= 0 ? '+' : '−'}${din(v)}`
 
 export default function App() {
   const m = useMotor()
-  const [tela, setTela] = useState<'operar' | 'casa'>('operar')
+  const [tela, setTela] = useState<'operar' | 'casa' | 'torre'>('operar')
   const [tipo, setTipo] = useState<TipoContrato>('DIGITO_ACIMA')
   const [barreira, setBarreira] = useState(5)
   const [valor, setValor] = useState(1)
@@ -71,6 +72,7 @@ export default function App() {
         <nav className="telas">
           <button className={tela === 'operar' ? 'on' : ''} onClick={() => setTela('operar')}>Operar</button>
           <button className={tela === 'casa' ? 'on' : ''} onClick={() => setTela('casa')}>Livro da casa</button>
+          <button className={tela === 'torre' ? 'on' : ''} onClick={() => setTela('torre')}>Torre de controle</button>
         </nav>
         <div className="topbar-right">
           <button className="prova-botao" onClick={() => setVerProva((v) => !v)}>
@@ -98,7 +100,10 @@ export default function App() {
         </div>
       )}
 
-      {tela === 'casa' ? (
+      {tela === 'torre' ? (
+        <TorreDeControle livro={m.livro} torre={m.torre} motores={m.motores}
+          auditoria={m.auditoria} pulso={m.pulso} aoMexer={m.atualizar} />
+      ) : tela === 'casa' ? (
         <PainelCasa livro={m.livro} instrumento={m.instrumento.codigo} />
       ) : (
         <div className="motor-layout">

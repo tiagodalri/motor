@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/versao.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "testes": "node testes/razao.mjs && node testes/casa.mjs && esbuild testes/torre.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache-torre.mjs --log-level=warning && node node_modules/.cache-torre.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
