@@ -110,7 +110,19 @@ async function principal() {
   await motor.abrirRodada('outra-semente')
   checar('abrir rodada nova limpa a marca', motor.adulterada === false)
 
-  console.log('\n7. a série continua reproduzível quando ninguém mexe')
+  console.log('\n7. a numeração de contratos sobrevive ao recarregamento')
+  const guardada = JSON.parse(JSON.stringify(livro.razao.exportar()))
+  const { Razao } = await import('../src/core/motor/razao')
+  const outroLivro = new Livro(Razao.importar(guardada))
+  outroLivro.risco.limites = { ...outroLivro.risco.limites, exposicaoPorCliente: 1e9, exposicaoPorBucket: 1e9 }
+  motor.passo()
+  let recusou = false
+  try {
+    outroLivro.apostar({ clienteId: 'ana', motor, cotacao: outroLivro.cotar({ tipo: 'DIGITO_PAR', valor: 1, ticks: 1 }) })
+  } catch (e) { recusou = (e as Error).message.includes('já foi registrado') }
+  checar('a primeira aposta depois de recarregar não colide com a chave antiga', !recusou)
+
+  console.log('\n8. a série continua reproduzível quando ninguém mexe')
   for (let k = 0; k < 400; k += 1) motor.passo()
   const servida = motor.historico(500)
   const refeita = await MotorDeTicks.reproduzir(

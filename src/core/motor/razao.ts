@@ -95,6 +95,24 @@ export class Razao {
     return saida
   }
 
+  /**
+   * Maior número de contrato já usado numa chave `aposta-c<N>`.
+   *
+   * A razão sobrevive à aba; o contador de contratos do livro, não. Sem
+   * isto o primeiro contrato depois de um recarregamento se chama `c1` de
+   * novo, bate na chave de idempotência do `c1` antigo e a aposta é
+   * recusada — a proteção contra clique duplo virando um bug que só
+   * aparece para quem volta.
+   */
+  maiorContrato(): number {
+    let maior = 0
+    for (const l of this.lancamentos) {
+      const m = /^aposta-c(\d+)$/.exec(l.chave)
+      if (m) maior = Math.max(maior, Number(m[1]))
+    }
+    return maior
+  }
+
   /** Todas as contas com movimento. */
   contas(): Conta[] {
     const s = new Set<Conta>()

@@ -67,6 +67,8 @@ export class Livro {
   constructor(razao = new Razao(), limites: Limites = LIMITES_PADRAO) {
     this.razao = razao
     this.risco = new Risco(limites)
+    // retoma a numeração de onde a razão guardada parou
+    this.sequencia = razao.maiorContrato() + 1
   }
 
   escutar(fn: Ouvinte): () => void {
