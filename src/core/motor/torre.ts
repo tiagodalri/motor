@@ -35,13 +35,18 @@ export class Torre {
   }
 
   private log(peso: Peso, area: string, acao: string, de?: unknown, para?: unknown) {
-    auditoria.registrar(peso, area, acao, de, para)
+    // Ajuste que não mudou nada não é ajuste. Um campo que registra a cada
+    // vez que perde o foco enche o log de linhas iguais, e log cheio de
+    // ruído é log que ninguém lê na hora que precisa.
+    if (de !== undefined && para !== undefined && String(de) === String(para)) return null
+    return auditoria.registrar(peso, area, acao, de, para)
   }
 
   /* ------------------------------------------------------------- risco */
 
   definirLimite(campo: keyof Limites, valor: number): void {
     const antes = this.livro.risco.limites[campo]
+    if (antes === valor) return
     this.livro.risco.limites = { ...this.livro.risco.limites, [campo]: valor }
     this.log('ajuste', 'risco', `limite ${campo}`, rotulo(antes), rotulo(valor))
   }
@@ -64,6 +69,7 @@ export class Torre {
 
   definirDisjuntor(ativo: boolean): void {
     const antes = this.livro.risco.disjuntorAtivo
+    if (antes === ativo) return
     this.livro.risco.disjuntorAtivo = ativo
     this.log(ativo ? 'ajuste' : 'quebra', 'risco', 'disjuntor automático',
       antes ? 'armado' : 'desarmado', ativo ? 'armado' : 'desarmado')
@@ -71,6 +77,7 @@ export class Torre {
 
   definirMinutosDeSuspensao(min: number): void {
     const antes = this.livro.risco.minutosDeSuspensao
+    if (antes === Math.max(0, min)) return
     this.livro.risco.minutosDeSuspensao = Math.max(0, min)
     this.log('ajuste', 'risco', 'duração da suspensão automática', `${antes} min`, `${min} min`)
   }
@@ -97,6 +104,7 @@ export class Torre {
 
   definirMargem(tipo: TipoContrato, margem: number): void {
     const antes = MARGEM[tipo]
+    if (antes === margem) return
     MARGEM[tipo] = Math.max(-0.5, Math.min(0.9, margem))
     this.log(margem < 0 ? 'quebra' : 'ajuste', 'precos', `margem ${tipo}`,
       pctTexto(antes), pctTexto(MARGEM[tipo]))
@@ -109,12 +117,14 @@ export class Torre {
 
   definirValidade(ms: number): void {
     const antes = PARAMETROS.validadeMs
+    if (antes === Math.max(200, ms)) return
     PARAMETROS.validadeMs = Math.max(200, ms)
     this.log('ajuste', 'precos', 'validade da cotação', `${antes} ms`, `${PARAMETROS.validadeMs} ms`)
   }
 
   definirAceitandoOrdens(aceita: boolean): void {
     const antes = PARAMETROS.aceitandoOrdens
+    if (antes === aceita) return
     PARAMETROS.aceitandoOrdens = aceita
     this.log('ajuste', 'precos', 'cotação da casa',
       antes ? 'aberta' : 'fechada', aceita ? 'aberta' : 'fechada')
@@ -122,12 +132,14 @@ export class Torre {
 
   definirValorMinimo(v: number): void {
     const antes = PARAMETROS.valorMinimo
+    if (antes === Math.max(0.01, v)) return
     PARAMETROS.valorMinimo = Math.max(0.01, v)
     this.log('ajuste', 'precos', 'valor mínimo', antes, PARAMETROS.valorMinimo)
   }
 
   definirTicksMaximo(n: number): void {
     const antes = PARAMETROS.ticksMaximo
+    if (antes === Math.max(1, Math.round(n))) return
     PARAMETROS.ticksMaximo = Math.max(1, Math.round(n))
     this.log('ajuste', 'precos', 'duração máxima', `${antes} ticks`, `${PARAMETROS.ticksMaximo} ticks`)
   }
@@ -167,6 +179,7 @@ export class Torre {
     const motor = this.motores()[codigo]
     if (!motor) return
     const antes = motor.velocidade
+    if (antes === v) return
     motor.definirVelocidade(v)
     this.log('ajuste', 'motor', `${codigo} · velocidade`, `${antes}×`, `${motor.velocidade}×`)
   }
