@@ -176,14 +176,17 @@ export function TorreDeControle({ livro, torre, motores, auditoria, aoMexer }: P
         </div>
       </div>
 
-      {(adulteradas.length > 0 || quebras > 0) && (
+      {/* A faixa vermelha responde ao estado AGORA, não ao histórico: o
+          contador de quebras nunca zera, e uma faixa que fica acesa para
+          sempre depois da primeira é uma faixa que se aprende a ignorar.
+          O acumulado continua visível no sinal "Quebras" lá em cima. */}
+      {adulteradas.length > 0 && (
         <div className="tc-alarme">
-          <b>Garantia rompida.</b>{' '}
-          {adulteradas.length > 0 && (
-            <>A série de {adulteradas.join(', ')} não é mais função pura das sementes publicadas —
-            a verificação do cliente vai falhar nesta rodada. Abrir rodada nova é o que limpa. </>
-          )}
-          {quebras > 0 && <>{quebras} operação(ões) de quebra registradas na auditoria. </>}
+          <b>Garantia rompida agora.</b>{' '}
+          A série de {adulteradas.join(', ')} não é mais função pura das sementes publicadas —
+          a verificação do cliente vai falhar nesta rodada. Abrir rodada nova em Motores é o
+          que limpa.
+          {quebras > 0 && <> ({quebras} operação(ões) de quebra no total desde sempre.)</>}
         </div>
       )}
 
