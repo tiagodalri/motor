@@ -4,7 +4,9 @@ import { Livro, type Contrato } from '../core/motor/livro'
 import { Razao } from '../core/motor/razao'
 import { Torre, type Motores } from '../core/motor/torre'
 import { auditoria } from '../core/motor/auditoria'
-import { ESTRATEGIAS, Robo } from '../core/motor/robo'
+import { Robo } from '../core/motor/robo'
+import { PERFIS } from '../core/motor/estrategias'
+import { Copiador } from '../core/motor/copiar'
 
 /**
  * Liga o motor à interface.
@@ -44,7 +46,10 @@ export function useMotor() {
   const livroRef = useRef<Livro | null>(null)
   const motoresRef = useRef<Motores>({})
   const torreRef = useRef<Torre | null>(null)
-  const robosRef = useRef<Record<string, Robo[]>>({})
+  // um trader por estratégia, cada um no instrumento dela, com conta
+  // própria — é a conta deles que o copiador espelha
+  const tradersRef = useRef<Record<string, Robo>>({})
+  const copiadoresRef = useRef<Record<string, Copiador>>({})
   const ativoRef = useRef<string>(instrumento.codigo)
 
   if (!livroRef.current) {
@@ -103,9 +108,18 @@ export function useMotor() {
         // dentro do componente, trocar para a torre de controle o mataria
         // no meio da sequência de gale — e é justamente na torre que se
         // quer olhar a cobertura enquanto ele opera.
-        robosRef.current[i.codigo] = ESTRATEGIAS.map(
-          (estrategia) => new Robo({ livro, motor, clienteId: CLIENTE, estrategia }),
-        )
+        for (const perfil of PERFIS.filter((p) => p.instrumento === i.codigo)) {
+          const conta = `trader:${perfil.id}`
+          if (livro.saldo(conta) <= 0) {
+            livro.depositar(conta, 1_000, `banca-${perfil.id}`)
+          }
+          tradersRef.current[perfil.id] = new Robo({
+            livro, motor, clienteId: conta, estrategia: perfil.regra,
+          })
+          copiadoresRef.current[perfil.id] = new Copiador({
+            livro, motor, clienteId: CLIENTE,
+          })
+        }
       }
     })()
   }, [livro, atualizar])
@@ -127,7 +141,10 @@ export function useMotor() {
     instrumento, setInstrumento, instrumentos: INSTRUMENTOS,
     motor: motoresRef.current[instrumento.codigo] ?? null,
     motores: motoresRef.current,
-    robos: robosRef.current[instrumento.codigo] ?? [],
+    traders: tradersRef.current,
+    copiadores: copiadoresRef.current,
+    robos: PERFIS.filter((p) => p.instrumento === instrumento.codigo)
+      .map((p) => tradersRef.current[p.id]).filter(Boolean),
     livro, torre, auditoria, cliente: CLIENTE,
     ticks, ultimo, abertos, historico, saldo, prova, pulso, atualizar,
   }

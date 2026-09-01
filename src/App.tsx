@@ -3,6 +3,7 @@ import { PriceChart, type ContractMarker } from './components/PriceChart'
 import { PainelCasa } from './components/PainelCasa'
 import { TorreDeControle } from './components/TorreDeControle'
 import { PainelRobos } from './components/PainelRobos'
+import { TelaCopy } from './components/TelaCopy'
 import { Brand } from './components/Brand'
 import { useMotor } from './hooks/useMotor'
 import { OrdemRecusada } from './core/motor/livro'
@@ -30,7 +31,7 @@ type Modalidade = 'digitos' | 'direcao'
 
 export default function App() {
   const m = useMotor()
-  const [tela, setTela] = useState<'operar' | 'casa' | 'torre'>('operar')
+  const [tela, setTela] = useState<'operar' | 'copy' | 'casa' | 'torre'>('operar')
   const [modalidade, setModalidade] = useState<Modalidade>('digitos')
   const [tipo, setTipo] = useState<TipoContrato>('DIGITO_ACIMA')
   const [barreira, setBarreira] = useState(5)
@@ -109,6 +110,7 @@ export default function App() {
         <Brand />
         <nav className="telas">
           <button className={tela === 'operar' ? 'on' : ''} onClick={() => setTela('operar')}>Operar</button>
+          <button className={tela === 'copy' ? 'on' : ''} onClick={() => setTela('copy')}>Copy trade</button>
           <button className={tela === 'casa' ? 'on' : ''} onClick={() => setTela('casa')}>Livro da casa</button>
           <button className={tela === 'torre' ? 'on' : ''} onClick={() => setTela('torre')}>Torre de controle</button>
         </nav>
@@ -141,6 +143,9 @@ export default function App() {
       {tela === 'torre' ? (
         <TorreDeControle livro={m.livro} torre={m.torre} motores={m.motores}
           auditoria={m.auditoria} pulso={m.pulso} aoMexer={m.atualizar} />
+      ) : tela === 'copy' ? (
+        <TelaCopy traders={m.traders} copiadores={m.copiadores}
+          saldo={m.saldo} aoMexer={m.atualizar} />
       ) : tela === 'casa' ? (
         <PainelCasa livro={m.livro} instrumento={m.instrumento.codigo} />
       ) : (
